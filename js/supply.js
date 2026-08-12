@@ -18,7 +18,6 @@ async function openSupplyModal() {
 
   // فلترة المنتجات بحسب صلاحية البراند للمستخدم الحالي
   availableProducts = (data || []).filter(p => {
-    // إذا كان للمستخدم صلاحية كلاً من البراندين أو كانت الخانة فارغة يظهر الكل
     if (
       userBrand.includes('&') || 
       userBrand.includes('Rudy Pizzeria & B-Marlin') || 
@@ -26,7 +25,6 @@ async function openSupplyModal() {
     ) {
       return true;
     }
-    // مطابقة اسم البراند مع التجاهل لحالة الأحرف والمسافات الزائدة
     return p.brand && p.brand.trim().toLowerCase() === userBrand.trim().toLowerCase();
   });
 
@@ -242,29 +240,70 @@ async function updateOrderStatus(orderId, newStatus) {
   loadOrders();
 }
 
-// 10. عرض تفاصيل الطلب وسجل الأحداث
+// 10. عرض تفاصيل الطلب وسجل الأحداث بشكل مرتب ومفصل بالصور
 async function viewOrderDetails(orderId) {
   const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
   const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
 
   const numElem = document.getElementById('modalOrderNum');
-  if (numElem && ordersList.find(o => o.id === orderId)) {
-    numElem.innerText = `(${ordersList.find(o => o.id === orderId).order_number})`;
+  const currentOrder = ordersList.find(o => o.id === orderId);
+  if (numElem && currentOrder) {
+    numElem.innerText = `(${currentOrder.order_number})`;
   }
 
   const content = document.getElementById('orderDetailsContent');
   if (content) {
-    content.innerHTML = (items || []).map(i => `
-      <p style="margin:5px 0;">• <strong>${i.product_name}</strong> - الكمية: ${i.quantity_pieces} حبة 
-      <small style="color:var(--text-muted);">(${ (i.quantity_pieces / (i.box_capacity || 1)).toFixed(1) } كرتون)</small></p>
-    `).join('');
+    const itemsHtml = (items || []).map(i => {
+      const boxes = (i.quantity_pieces / (i.box_capacity || 1)).toFixed(1);
+      const imgUrl = i.image_url || 'https://via.placeholder.com/50';
+      
+      return `
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--border-color, #333);">
+          <img src="${imgUrl}" alt="${i.product_name}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color, #444); background: #222;" onerror="this.src='https://via.placeholder.com/48'">
+          <div style="flex: 1;">
+            <div style="font-weight: bold; font-size: 0.95rem; color: var(--text-color, #fff);">${i.product_name}</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted, #aaa); margin-top: 2px;">
+              الكمية: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${i.quantity_pieces}</span> حبة 
+              <span style="opacity: 0.8;">(${boxes} كرتون)</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    content.innerHTML = `
+      <div style="margin-bottom: 15px;">
+        <h6 style="margin-bottom: 10px; color: var(--primary-color, #4CAF50); font-size: 0.9rem;">📦 منتجات الطلب:</h6>
+        ${itemsHtml || '<p style="color:var(--text-muted);">لا توجد عناصر</p>'}
+      </div>
+    `;
   }
 
   const timeline = document.getElementById('orderTimeline');
   if (timeline) {
-    timeline.innerHTML = (logs || []).map(l => `
-      <li><strong>${l.status_change}</strong> بواسطة: ${l.action_by} - <small style="color:var(--text-muted);">${new Date(l.created_at).toLocaleString()}</small></li>
-    `).join('');
+    const logsHtml = (logs || []).map(l => {
+      const dateFormatted = new Date(l.created_at).toLocaleString('ar-SA', {
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      
+      return `
+        <li style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-color, #ddd); list-style-type: disc;">
+          <span style="font-weight: bold;">${l.status_change}</span>
+          <span style="color: var(--text-muted, #aaa);"> بواسطة: </span>
+          <span style="color: #64B5F6;">${l.action_by}</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 2px;">🕒 ${dateFormatted}</div>
+        </li>
+      `;
+    }).join('');
+
+    timeline.innerHTML = `
+      <hr style="border: 0; border-top: 1px solid var(--border-color, #444); margin: 20px 0 15px 0;">
+      <h6 style="margin-bottom: 10px; color: #FFB74D; font-size: 0.9rem;">📜 سجل الإجراءات (Audit Log):</h6>
+      <ul style="padding-right: 20px; margin: 0;">
+        ${logsHtml || '<li style="color:var(--text-muted);">لا يوجد سجل إجراءات</li>'}
+      </ul>
+    `;
   }
 
   openModal('orderDetailsModal');
