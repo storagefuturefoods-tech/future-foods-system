@@ -2,6 +2,14 @@ let availableProducts = [];
 let cart = [];
 let ordersList = [];
 
+// جلب اسم الموظف الفعلي بدلاً من المسمى الوظيفي
+function getEmployeeName() {
+  if (typeof currentUser !== 'undefined' && currentUser) {
+    return currentUser.name || currentUser.full_name || currentUser.user_name || currentUser.email || 'Admin';
+  }
+  return 'Admin';
+}
+
 // 1. فتح نافذة الطلب وجلب المنتجات المتاحة
 async function openSupplyModal() {
   const { data, error } = await _supabase
@@ -16,7 +24,6 @@ async function openSupplyModal() {
 
   const userBrand = currentUser.brand_permission || currentUser.brand || '';
 
-  // فلترة المنتجات بحسب صلاحية البراند للمستخدم الحالي
   availableProducts = (data || []).filter(p => {
     if (
       userBrand.includes('&') || 
@@ -143,12 +150,13 @@ async function submitOrder() {
 
   const orderNum = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
   const notes = document.getElementById('orderNotes')?.value || '';
+  const empName = getEmployeeName();
 
   const { data: newOrder, error } = await _supabase
     .from('orders')
     .insert([{
       order_number: orderNum,
-      user_name: currentUser.name,
+      user_name: empName,
       user_email: currentUser.email,
       brand: currentUser.brand_permission || currentUser.brand,
       total_items: cart.length,
@@ -173,7 +181,7 @@ async function submitOrder() {
   await _supabase.from('order_logs').insert([{
     order_id: newOrder.id,
     status_change: 'إنشاء الطلب (جديد)',
-    action_by: currentUser.name
+    action_by: empName
   }]);
 
   alert("تم إرسال الطلب بنجاح! رقم الطلب: " + orderNum);
@@ -231,16 +239,17 @@ async function loadOrders() {
 
 // 9. تغيير حالة الطلب وتحديث السجل الزمني
 async function updateOrderStatus(orderId, newStatus) {
+  const empName = getEmployeeName();
   await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
   await _supabase.from('order_logs').insert([{
     order_id: orderId,
     status_change: `تغيير الحالة إلى (${newStatus})`,
-    action_by: currentUser.name
+    action_by: empName
   }]);
   loadOrders();
 }
 
-// 10. عرض تفاصيل الطلب وسجل الأحداث بشكل مرتب ومفصل بالصور
+// 10. عرض تفاصيل الطلب وسجل الأحداث بالتاريخ الميلادي الإنجليزي واسم الموظف
 async function viewOrderDetails(orderId) {
   const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
   const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
@@ -282,9 +291,16 @@ async function viewOrderDetails(orderId) {
   const timeline = document.getElementById('orderTimeline');
   if (timeline) {
     const logsHtml = (logs || []).map(l => {
-      const dateFormatted = new Date(l.created_at).toLocaleString('ar-SA', {
-        year: 'numeric', month: 'numeric', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      // تنسيق التاريخ والوقت بالأرقام الإنجليزية والتقويم الميلادي 24H / 12H
+      const d = new Date(l.created_at);
+      const formattedDate = d.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
       });
       
       return `
@@ -292,7 +308,7 @@ async function viewOrderDetails(orderId) {
           <span style="font-weight: bold;">${l.status_change}</span>
           <span style="color: var(--text-muted, #aaa);"> بواسطة: </span>
           <span style="color: #64B5F6;">${l.action_by}</span>
-          <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 2px;">🕒 ${dateFormatted}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 2px;">🕒 ${formattedDate}</div>
         </li>
       `;
     }).join('');
