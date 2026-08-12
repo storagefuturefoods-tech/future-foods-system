@@ -1,1 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الإعدادات</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header>
+    <h1>إعدادات النظام</h1>
+    <nav>
+      <a href="index.html">الرئيسية</a>
+      <a href="inventory.html">المخزون</a>
+      <a href="supply-requests.html">طلبات التغذية</a>
+      <a href="settings.html">الإعدادات</a>
+    </nav>
+    <div class="user-info">
+      <span id="currentUserDisplay"></span>
+      <button class="btn btn-secondary" onclick="toggleLanguage()">Ar/En</button>
+    </div>
+  </header>
 
+  <div class="container">
+    <div class="card">
+      <h3>بيانات النظام الأساسية</h3>
+      <p><strong>اسم المنشأة:</strong> مخزن مستقبل الأطعمة</p>
+      <p><strong>البريد الإلكتروني:</strong> storage.futurefoods@gmail.com</p>
+      <p><strong>العنوان:</strong> العليا شارع موسى بن نصير</p>
+    </div>
+
+    <div class="card">
+      <h3>إدارة المستخدمين والصلاحيات</h3>
+      <button class="btn" style="margin-bottom:15px;" onclick="openModal('userModal')">+ إضافة مستخدم جديد</button>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>الاسم</th>
+            <th>البريد الإلكتروني</th>
+            <th>المسمى الوظيفي</th>
+            <th>صلاحية الفرع / البراند</th>
+          </tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <h3>إضافة مستخدم جديد</h3>
+      <form onsubmit="saveUser(event)">
+        <div class="form-group"><label>الاسم الكامل</label><input type="text" id="uName" required></div>
+        <div class="form-group"><label>البريد الإلكتروني</label><input type="email" id="uEmail" required></div>
+        <div class="form-group"><label>كلمة السر المؤقتة</label><input type="password" id="uPass" required></div>
+        <div class="form-group"><label>المسمى الوظيفي</label><input type="text" id="uRole" required></div>
+        <div class="form-group">
+          <label>صلاحية البراند</label>
+          <select id="uBrand" required>
+            <option value="B-marlin">B-marlin</option>
+            <option value="Rudy">Rudy</option>
+            <option value="Rudy Pizzeria & B-Marlin">Rudy Pizzeria & B-Marlin</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">حفظ المستخدم</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">إلغاء</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>
