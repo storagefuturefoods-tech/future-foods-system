@@ -106,7 +106,7 @@ function addToCart(prodId) {
   }
   
   updateCartBadge();
-  renderProductsGrid(availableProducts); // إعادة رسم القائمة ليتغير لون الزر لرمادي
+  renderProductsGrid(availableProducts);
 }
 
 // 5. تحديث عداد السلة والشكل
@@ -116,7 +116,7 @@ function updateCartBadge() {
   renderCart();
 }
 
-// 6. عرض قائمة السلة مع التحكم الصارم بالكميات
+// 6. عرض قائمة السلة (مع ضبط الخط 16px والمحاذاة لمنع الزوم وانزياح المؤشر)
 function renderCart() {
   const container = document.getElementById('cartItemsList');
   if (!container) return;
@@ -135,8 +135,15 @@ function renderCart() {
           <strong>${name}</strong><br>
           <small style="color:var(--text-muted);">الكرتون به: ${item.items_per_box} حبة | المتوفر: ${item.quantity}</small>
         </div>
-        <input type="number" min="1" max="${item.quantity}" value="${item.reqQty}" oninput="changeCartQty(${index}, this.value)" style="width:70px; padding:5px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:4px;">
-        <button class="btn btn-danger" style="padding:4px 8px;" onclick="removeFromCart(${index})">✕</button>
+        <input 
+          type="number" 
+          min="1" 
+          max="${item.quantity}" 
+          value="${item.reqQty}" 
+          oninput="changeCartQty(${index}, this.value)" 
+          style="width: 75px; height: 38px; padding: 2px 5px; font-size: 16px; text-align: center; direction: ltr; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 6px; outline: none;"
+        >
+        <button class="btn btn-danger" style="padding: 6px 10px; height: 38px;" onclick="removeFromCart(${index})">✕</button>
       </div>
     `;
   });
@@ -147,10 +154,10 @@ function changeCartQty(index, val) {
   const max = cart[index].quantity;
 
   if (isNaN(qty) || qty < 1) {
-    qty = 1; // حماية من الصفر والأعداد السالبة
+    qty = 1;
   } else if (qty > max) {
     alert(`عذراً، الكمية المتاحة في المخزون هي ${max} فقط!`);
-    qty = max; // منع تجاوز المتاح
+    qty = max;
   }
   
   cart[index].reqQty = qty;
@@ -160,14 +167,13 @@ function changeCartQty(index, val) {
 function removeFromCart(index) { 
   cart.splice(index, 1); 
   updateCartBadge(); 
-  renderProductsGrid(availableProducts); // إعادة تفعيل زر الإضافة للمنتج المنسحب
+  renderProductsGrid(availableProducts);
 }
 
 // 7. إرسال الطلب النهائي مع الفحص الشامل للكميات
 async function submitOrder() {
   if (cart.length === 0) return alert("السلة فارغة!");
 
-  // فحص نهائي للكميات قبل الترحيل
   for (let item of cart) {
     const prodName = currentLang === 'ar' ? item.name_ar : item.name_en;
     if (!item.reqQty || item.reqQty <= 0) {
@@ -279,7 +285,7 @@ async function updateOrderStatus(orderId, newStatus) {
   loadOrders();
 }
 
-// 10. عرض تفاصيل الطلب وسجل الأحداث بالتاريخ الميلادي الإنجليزي واسم الموظف
+// 10. عرض تفاصيل الطلب وسجل الأحداث
 async function viewOrderDetails(orderId) {
   const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
   const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
