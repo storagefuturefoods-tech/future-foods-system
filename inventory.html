@@ -1,1 +1,86 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة المخزون</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>إدارة المخزون</h1>
+    <nav>
+      <a href="index.html">الرئيسية</a>
+      <a href="inventory.html">المخزون</a>
+      <a href="supply-requests.html">طلبات التغذية</a>
+      <a href="settings.html">الإعدادات</a>
+    </nav>
+    <div class="user-info">
+      <span id="currentUserDisplay"></span>
+      <button class="btn btn-secondary" onclick="toggleLanguage()">Ar/En</button>
+    </div>
+  </header>
 
+  <div class="container">
+    <div class="card">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: space-between;">
+        <div>
+          <button class="btn" onclick="downloadTemplate()">تحميل نموذج الإكسل</button>
+          <input type="file" id="excelInput" accept=".xlsx, .xls" style="display:none" onchange="handleExcelUpload(event)">
+          <button class="btn btn-warning" onclick="document.getElementById('excelInput').click()">رفع منتجات من إكسل</button>
+        </div>
+        <div>
+          <button class="btn btn-secondary" onclick="exportSelected()">تصدير المحددة/الكل</button>
+          <button class="btn btn-danger" onclick="deleteSelected()">حذف المحدد</button>
+        </div>
+      </div>
+
+      <table id="inventoryTable">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+            <th>الصورة</th>
+            <th>رمز المنتج (SKU)</th>
+            <th>الاسم (عربي)</th>
+            <th>الاسم (En)</th>
+            <th>البراند</th>
+            <th>الكمية</th>
+            <th>سعة الكرتون</th>
+            <th>الحالة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal تعديل منتج -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <h3>تعديل المنتج</h3>
+      <form id="editForm" onsubmit="saveProductEdit(event)" style="margin-top: 15px;">
+        <input type="hidden" id="editProdId">
+        <div class="form-group"><label>رابط الصورة</label><input type="text" id="editImage"></div>
+        <div class="form-group"><label>رمز المنتج SKU</label><input type="text" id="editSku" required disabled></div>
+        <div class="form-group"><label>الاسم بالعربي</label><input type="text" id="editNameAr" required></div>
+        <div class="form-group"><label>الاسم بالإنكليزي</label><input type="text" id="editNameEn" required></div>
+        <div class="form-group"><label>البراند</label><input type="text" id="editBrand" required></div>
+        <div class="form-group"><label>الكمية بالحبة</label><input type="number" id="editQty" required></div>
+        <div class="form-group"><label>الحد الأدنى للتنبيه</label><input type="number" id="editMinQty" required></div>
+        <div class="form-group"><label>عدد الحبات بالكرتون</label><input type="number" id="editBoxCap" required></div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="btn">حفظ التعديلات</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">إلغاء</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/inventory.js"></script>
+</body>
+</html>
