@@ -3,30 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>مخزن مستقبل الأطعمة | الرئيسية</title>
+  <title>الرئيسية</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
-    <h1>مخزن مستقبل الأطعمة</h1>
+    <h1 data-i18n="system_title">مخزن مستقبل الأطعمة</h1>
     <nav>
-      <a href="index.html">الرئيسية</a>
-      <a href="inventory.html">المخزون</a>
-      <a href="supply-requests.html">طلبات التغذية</a>
-      <a href="settings.html">الإعدادات</a>
+      <a href="index.html" data-i18n="nav_home">الرئيسية</a>
+      <a href="inventory.html" data-i18n="nav_inventory">المخزون</a>
+      <a href="supply-requests.html" data-i18n="nav_supply">طلبات التغذية</a>
+      <a href="settings.html" data-i18n="nav_settings">الإعدادات</a>
     </nav>
     <div class="user-info">
       <span id="currentUserDisplay"></span>
       <button class="btn btn-secondary" onclick="toggleLanguage()">Ar/En</button>
-      <button class="btn btn-danger" onclick="logout()">خروج</button>
+      <button class="btn btn-danger" onclick="logout()" data-i18n="logout">تسجيل الخروج</button>
     </div>
   </header>
 
   <div class="container">
     <div class="card">
-      <h2>مرحباً بك في نظام إدارة مخزن مستقبل الأطعمة</h2>
-      <p style="margin-top: 10px;">اختر من القائمة العلوية للانتقال للقسم المطلوب (المخزون، طلبات التغذية، أو الإعدادات).</p>
+      <h2 data-i18n="welcome">مرحباً بك في نظام إدارة مخزن مستقبل الأطعمة</h2>
+      <p style="margin-top: 10px;" data-i18n="welcome_sub">اختر من القائمة العلوية للانتقال للقسم المطلوب.</p>
     </div>
   </div>
 
