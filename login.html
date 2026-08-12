@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="container login-container">
+    <div class="card">
+      <h2 style="text-align: center; margin-bottom: 20px;" data-i18n="login_title">تسجيل الدخول للنظام</h2>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label data-i18n="email">البريد الإلكتروني</label>
+          <input type="email" id="loginEmail" required value="storage.futurefoods@gmail.com">
+        </div>
+        <div class="form-group">
+          <label data-i18n="password">كلمة السر</label>
+          <input type="password" id="loginPassword" required value="123456">
+        </div>
+        <button type="submit" class="btn" style="width: 100%; margin-top: 10px;" data-i18n="login_btn">دخول</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      const { data, error } = await _supabase
+        .from('system_users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .single();
+
+      if (error || !data) {
+        alert(translations[currentLang].invalid_login);
+      } else {
+        localStorage.setItem('app_user', JSON.stringify(data));
+        window.location.href = 'index.html';
+      }
+    }
+  </script>
+</body>
+</html>
