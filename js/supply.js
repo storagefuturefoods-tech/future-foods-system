@@ -10,6 +10,39 @@ function getEmployeeName() {
   return 'Admin';
 }
 
+// دوال معاينة الصورة
+function previewImage(src, altText) {
+  let modal = document.getElementById('imgPreviewModal');
+  let img = document.getElementById('previewImageSrc');
+  
+  // إنشاء العنصر تلقائياً إن لم يكن موجوداً في HTML
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'imgPreviewModal';
+    modal.className = 'img-preview-modal';
+    modal.onclick = closeImagePreview;
+    modal.innerHTML = `
+      <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
+      <img id="previewImageSrc" src="" alt="معاينة المنتج">
+    `;
+    document.body.appendChild(modal);
+    img = document.getElementById('previewImageSrc');
+  }
+
+  if (modal && img) {
+    img.src = src;
+    img.alt = altText || 'صورة المنتج';
+    modal.style.display = 'flex';
+  }
+}
+
+function closeImagePreview() {
+  const modal = document.getElementById('imgPreviewModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
 // 1. فتح نافذة الطلب وجلب المنتجات المتاحة
 async function openSupplyModal() {
   const { data, error } = await _supabase
@@ -39,7 +72,7 @@ async function openSupplyModal() {
   openModal('supplyModal');
 }
 
-// 2. عرض شبكة المنتجات مع تعطيل الزر للمنتجات المضافة للسلة
+// 2. عرض شبكة المنتجات بتصميم متجاوب ومعاينة الصورة عند النقر
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
@@ -54,26 +87,33 @@ function renderProductsGrid(prods) {
     const isOutOfStock = p.quantity <= 0;
     const isInCart = cart.some(item => item.id === p.id);
     const name = currentLang === 'ar' ? p.name_ar : p.name_en;
+    const imgUrl = p.image_url || 'https://via.placeholder.com/150';
 
     // تحديد حالة الزر والشكل
     let btnDisabled = isOutOfStock || isInCart;
     let btnText = 'إضافة للسلة';
-    let btnStyle = '';
+    let btnStyle = 'width: 100%; padding: 6px 4px; font-size: 0.85rem;';
 
     if (isOutOfStock) {
       btnText = 'مخلص';
-      btnStyle = 'background: #555; cursor: not-allowed; opacity: 0.6;';
+      btnStyle += ' background: #555; cursor: not-allowed; opacity: 0.6;';
     } else if (isInCart) {
       btnText = 'تمت الإضافة ✔';
-      btnStyle = 'background: #4A5568; cursor: not-allowed; opacity: 0.7;';
+      btnStyle += ' background: #4A5568; cursor: not-allowed; opacity: 0.7;';
     }
     
     grid.innerHTML += `
       <div class="product-card">
-        <img src="${p.image_url || 'https://via.placeholder.com/100'}" alt="${name}" onerror="this.src='https://via.placeholder.com/100'">
-        <h5 style="margin: 8px 0; color: var(--text-color);">${name}</h5>
-        <p style="font-size:0.8rem; color:var(--text-muted);">البراند: ${p.brand}</p>
-        <p style="font-size:0.85rem; margin: 4px 0;">المتوفر: <strong>${p.quantity}</strong> حبة</p>
+        <img 
+          src="${imgUrl}" 
+          alt="${name}" 
+          title="اضغط للتكبير والمعاينة"
+          onclick="previewImage('${imgUrl}', '${name}')"
+          onerror="this.src='https://via.placeholder.com/150'"
+        >
+        <h6 style="margin: 8px 0 4px 0; color: var(--text-color); font-size: 0.85rem; line-height: 1.2; font-weight: 600; min-height: 32px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${name}</h6>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin: 2px 0;">${p.brand}</p>
+        <p style="font-size:0.8rem; margin: 4px 0 8px 0;">المتوفر: <strong>${p.quantity}</strong> حبة</p>
         <button class="btn" style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
           ${btnText}
         </button>
