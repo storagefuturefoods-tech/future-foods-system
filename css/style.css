@@ -192,3 +192,68 @@ th {
   max-width: 400px;
   margin: 100px auto;
 }
+
+/* شبكة المنتجات المرنة */
+#productsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 10px 0;
+}
+
+/* للشاشات المتوسطة والكبيرة (الكمبيوتر) */
+@media (min-width: 992px) {
+  #productsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+  }
+}
+
+/* بطاقة المنتج */
+.product-card {
+  background: var(--card-bg, #1e1e1e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: space-between;
+}
+
+.product-card img {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.product-card img:hover {
+  transform: scale(1.05);
+}
+
+/* modal معاينة الصورة */
+.img-preview-modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+
+.img-preview-modal img {
+  max-width: 90%;
+  max-height: 80vh;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  object-fit: contain;
+}
