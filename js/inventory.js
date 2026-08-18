@@ -1,8 +1,8 @@
 let products = [];
-let currentUser = {};
+let invCurrentUser = {};
 
-// جلب المستخدم الحالي بشكل أمن
-function getCurrentUser() {
+// جلب المستخدم الحالي بشكل آمن
+function getInvCurrentUser() {
   try {
     return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
   } catch (e) {
@@ -11,8 +11,8 @@ function getCurrentUser() {
 }
 
 // فحص هل المستخدم مدير نظام أم مدير مخزن
-function isAdminOrManager() {
-  const u = getCurrentUser();
+function isInvAdminOrManager() {
+  const u = getInvCurrentUser();
   const role = (u.role || '').toLowerCase();
   const email = (u.email || '').toLowerCase();
   
@@ -21,7 +21,7 @@ function isAdminOrManager() {
 
 // 1. تحميل بيانات المستخدم وتصفية المنتجات
 async function loadProducts() {
-  currentUser = getCurrentUser();
+  invCurrentUser = getInvCurrentUser();
 
   // جلب كافة المنتجات من Supabase
   const { data, error } = await _supabase
@@ -37,7 +37,7 @@ async function loadProducts() {
   const rawProducts = data || [];
 
   // فلترة المنتجات بناءً على صلاحية البراند المسندة للمستخدم
-  const userBrandPermission = currentUser.brand_permission || currentUser.brand || 'All';
+  const userBrandPermission = invCurrentUser.brand_permission || invCurrentUser.brand || 'All';
   products = filterProductsByBrandPermission(rawProducts, userBrandPermission);
 
   // عرض الجدول
@@ -86,7 +86,7 @@ function renderTable() {
     return;
   }
 
-  const isUserAdmin = isAdminOrManager();
+  const isUserAdmin = isInvAdminOrManager();
 
   products.forEach(p => {
     const isLow = p.quantity <= (p.min_quantity || 0);
@@ -99,7 +99,7 @@ function renderTable() {
           ${p.is_disabled ? 'تفعيل' : 'تعطيل'}
         </button>
       </td>
-    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">عروض فقط</span></td>`;
+    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">عرض فقط</span></td>`;
 
     tbody.innerHTML += `
       <tr style="${isLow ? 'background-color: rgba(255, 0, 0, 0.1);' : ''}">
@@ -121,7 +121,7 @@ function renderTable() {
 
 // 4. تطبيق التحكم بالأزرار العليا (منع المستخدم العادي من الإضافة والحذف، وإبقاء التصدير)
 function applyUserPermissions() {
-  if (!isAdminOrManager()) {
+  if (!isInvAdminOrManager()) {
     // إخفاء زر الرفع وزر الحذف
     const uploadBtn = document.querySelector('button[onclick*="excelInput"]');
     const deleteBtn = document.querySelector('button[onclick*="deleteSelected"]');
@@ -167,7 +167,7 @@ function downloadTemplate() {
 
 // 6. معالجة ورفع ملف الإكسل
 async function handleExcelUpload(e) {
-  if (!isAdminOrManager()) {
+  if (!isInvAdminOrManager()) {
     alert("عذراً، لا تملك صلاحية إضافة أو تعديل المنتجات.");
     return;
   }
@@ -235,7 +235,7 @@ async function handleExcelUpload(e) {
 
 // 7. فتح نافذة التعديل
 function openEditModal(id) {
-  if (!isAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
 
   const p = products.find(x => x.id === id);
   if (!p) return;
@@ -263,7 +263,7 @@ function closeModal(id) {
 // 8. حفظ تعديل المنتج
 async function saveProductEdit(e) {
   e.preventDefault();
-  if (!isAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
 
   const id = document.getElementById('editProdId').value;
   const catInput = document.getElementById('editCategory');
@@ -290,14 +290,14 @@ async function saveProductEdit(e) {
 
 // 9. تغيير حالة المنتج (تفعيل/تعطيل)
 async function toggleStatus(id, currentStatus) {
-  if (!isAdminOrManager()) return alert("عذراً، لا تملك هذه الصلاحية.");
+  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك هذه الصلاحية.");
   await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
   loadProducts();
 }
 
 // 10. حذف المنتجات المحددة
 async function deleteSelected() {
-  if (!isAdminOrManager()) return alert("عذراً، لا تملك صلاحية حذف المنتجات.");
+  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية حذف المنتجات.");
 
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
   if (ids.length === 0) return alert("الرجاء تحديد منتجات لحذفها");
