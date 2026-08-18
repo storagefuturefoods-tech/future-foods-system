@@ -2,11 +2,27 @@ let availableProducts = [];
 let cart = [];
 let ordersList = [];
 
-function getEmployeeName() {
-  if (typeof currentUser !== 'undefined' && currentUser) {
-    return currentUser.name || currentUser.full_name || currentUser.user_name || currentUser.email || 'Admin';
+// جلب المستخدم الحالي
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
+  } catch (e) {
+    return {};
   }
-  return 'Admin';
+}
+
+// فحص هل المستخدم مدير نظام أم مدير مخزن
+function isAdminOrManager() {
+  const u = getCurrentUser();
+  const role = u.role || '';
+  const email = (u.email || '').toLowerCase();
+  
+  return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
+}
+
+function getEmployeeName() {
+  const currentUser = getCurrentUser();
+  return currentUser.name || currentUser.full_name || currentUser.user_name || currentUser.email || 'Admin';
 }
 
 function previewImage(src, altText) {
@@ -38,7 +54,7 @@ function closeImagePreview() {
   if (modal) modal.style.display = 'none';
 }
 
-// 1. فتح نافذة الطلب وجلب المنتجات والتصنيفات
+// 1. فتح نافذة الطلب وجلب المنتجات مع الفلترة الصحيحة للمشترك
 async function openSupplyModal() {
   const { data, error } = await _supabase
     .from('products')
@@ -50,27 +66,38 @@ async function openSupplyModal() {
     return;
   }
 
-  const userBrand = currentUser.brand_permission || currentUser.brand || '';
+  const currentUser = getCurrentUser();
+  const userBrand = (currentUser.brand_permission || currentUser.brand || 'All').trim().toLowerCase();
 
   availableProducts = (data || []).filter(p => {
+    // إذا كان الأدمن أو لديه صلاحية "كل الفروع" أو "المشترك"
     if (
+      userBrand === 'all' || 
+      userBrand === '' || 
       userBrand.includes('&') || 
-      userBrand.includes('Rudy Pizzeria & B-Marlin') || 
-      !userBrand
+      userBrand.includes('pizzeria') || 
+      userBrand.includes('marlin') && userBrand.includes('rudy')
     ) {
       return true;
     }
-    return p.brand && p.brand.trim().toLowerCase() === userBrand.trim().toLowerCase();
+
+    const prodBrand = (p.brand || '').trim().toLowerCase();
+
+    // إظهار منتجات الفرع الخاص به + المنتجات المشتركة
+    return (
+      prodBrand === userBrand || 
+      prodBrand === 'all' || 
+      prodBrand.includes('&') || 
+      prodBrand.includes('مشترك') ||
+      prodBrand.includes('shared')
+    );
   });
 
-  // تعبئة قائمة التصنيفات ديناميكياً
   populateCategoriesDropdown(availableProducts);
-
   renderProductsGrid(availableProducts);
   openModal('supplyModal');
 }
 
-// استخراج كافة التصنيفات المتاحة وتعبئتها في القائمة
 function populateCategoriesDropdown(products) {
   const catSelect = document.getElementById('categoryFilter');
   if (!catSelect) return;
@@ -134,7 +161,6 @@ function renderProductsGrid(prods) {
   });
 }
 
-// 3. فلترة المنتجات بالاسم والتصنيف المختار
 function filterProducts() {
   const query = (document.getElementById('prodSearch')?.value || '').toLowerCase();
   const selectedCat = document.getElementById('categoryFilter')?.value || 'ALL';
@@ -237,6 +263,7 @@ async function submitOrder() {
     }
   }
 
+  const currentUser = getCurrentUser();
   const orderNum = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
   const notes = document.getElementById('orderNotes')?.value || '';
   const empName = getEmployeeName();
@@ -281,6 +308,7 @@ async function submitOrder() {
   loadOrders();
 }
 
+// 3. جلب الطلبات مع تقييد التحكم بالحالة حسب الصلاحية
 async function loadOrders() {
   const filter = document.getElementById('statusFilter')?.value || 'الكل';
   let query = _supabase.from('orders').select('*').order('id', { ascending: false });
@@ -301,7 +329,20 @@ async function loadOrders() {
     return;
   }
 
+  const canEditStatus = isAdminOrManager();
+
   ordersList.forEach(o => {
+    // إذا كان المستخدم مدير تظهر له القائمة المنسدلة، أما الشيف فيظهر له النص فقط بدون إمكانية التغيير
+    const statusCell = canEditStatus ? `
+      <select onchange="updateOrderStatus(${o.id}, this.value)" style="padding:4px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:4px;">
+        <option value="جديد" ${o.status==='جديد'?'selected':''}>جديد</option>
+        <option value="جاري التجهيز" ${o.status==='جاري التجهيز'?'selected':''}>جاري التجهيز</option>
+        <option value="جاهز" ${o.status==='جاهز'?'selected':''}>جاهز</option>
+        <option value="مكتمل" ${o.status==='مكتمل'?'selected':''}>مكتمل</option>
+        <option value="ملغي" ${o.status==='ملغي'?'selected':''}>ملغي</option>
+      </select>
+    ` : `<span style="font-weight:bold; padding: 4px 8px; border-radius:4px; background:rgba(255,255,255,0.1);">${o.status}</span>`;
+
     tbody.innerHTML += `
       <tr>
         <td><input type="checkbox" class="order-select" value="${o.id}"></td>
@@ -309,15 +350,7 @@ async function loadOrders() {
         <td>${o.user_name || '-'}</td>
         <td>${o.brand || '-'}</td>
         <td>${o.total_items}</td>
-        <td>
-          <select onchange="updateOrderStatus(${o.id}, this.value)" style="padding:4px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:4px;">
-            <option value="جديد" ${o.status==='جديد'?'selected':''}>جديد</option>
-            <option value="جاري التجهيز" ${o.status==='جاري التجهيز'?'selected':''}>جاري التجهيز</option>
-            <option value="جاهز" ${o.status==='جاهز'?'selected':''}>جاهز</option>
-            <option value="مكتمل" ${o.status==='مكتمل'?'selected':''}>مكتمل</option>
-            <option value="ملغي" ${o.status==='ملغي'?'selected':''}>ملغي</option>
-          </select>
-        </td>
+        <td>${statusCell}</td>
         <td>${o.notes || '-'}</td>
         <td><button class="btn" style="padding:4px 8px;" onclick="viewOrderDetails(${o.id})">تفاصيل</button></td>
       </tr>
@@ -326,6 +359,12 @@ async function loadOrders() {
 }
 
 async function updateOrderStatus(orderId, newStatus) {
+  if (!isAdminOrManager()) {
+    alert("عذراً، ليس لديك صلاحية لتغيير حالة الطلبات!");
+    loadOrders();
+    return;
+  }
+
   const empName = getEmployeeName();
   await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
   await _supabase.from('order_logs').insert([{
