@@ -1,16 +1,53 @@
 let products = [];
+let currentUser = {};
 
+// 1. تحميل بيانات المستخدم وتصفية المنتجات بناءً على الصلاحيات
 async function loadProducts() {
-  const { data, error } = await _supabase.from('products').select('*');
+  // جلب بيانات المستخدم الحالي المسجل دخوله
+  currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  // جلب كافة المنتجات من Supabase
+  const { data, error } = await _supabase.from('products').select('*').order('id', { ascending: true });
   if (error) return alert("خطأ في جلب البيانات: " + error.message);
-  products = data || [];
+
+  const rawProducts = data || [];
+
+  // فلترة المنتجات بناءً على صلاحية البراند المسندة للمستخدم
+  products = filterProductsByBrandPermission(rawProducts, currentUser.brand_permission);
+
+  // عرض الجدول
   renderTable();
+
+  // تطبيق صلاحيات الإخفاء/الإظهار بناءً على نوع حساب المستخدم (شيف / مدير)
+  applyUserPermissions();
 }
 
+// 2. دالة الفلترة حسب البراند
+function filterProductsByBrandPermission(allProducts, userBrandPermission) {
+  const SHARED_BRAND = "Rudy Pizzeria & B-Marlin";
+
+  // إذا كان المستخدم يملك صلاحية كل الفروع أو غير محدد
+  if (!userBrandPermission || userBrandPermission === 'All' || userBrandPermission === 'Rudy Pizzeria & B-Marlin') {
+    return allProducts;
+  }
+
+  // فلترة: براند المستخدم الخاص + البراند المشترك
+  return allProducts.filter(p => {
+    const pBrand = (p.brand || '').trim();
+    return pBrand === userBrandPermission || pBrand === SHARED_BRAND;
+  });
+}
+
+// 3. عرض جدول المخزون
 function renderTable() {
   const tbody = document.getElementById('inventoryBody');
   if (!tbody) return;
   tbody.innerHTML = '';
+
+  if (products.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">لا توجد منتجات مجهزة للعرض لهذا الفرع/البراند.</td></tr>';
+    return;
+  }
 
   products.forEach(p => {
     const isLow = p.quantity <= p.min_quantity;
@@ -27,8 +64,8 @@ function renderTable() {
         <td>${p.items_per_box || 1}</td>
         <td>${p.is_disabled ? 'معطل' : 'نشط'}</td>
         <td>
-          <button class="btn" onclick="openEditModal(${p.id})">تعديل</button>
-          <button class="btn ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
+          <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">تعديل</button>
+          <button class="btn btn-status-action ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
             ${p.is_disabled ? 'تفعيل' : 'تعطيل'}
           </button>
         </td>
@@ -37,6 +74,21 @@ function renderTable() {
   });
 }
 
+// 4. تطبيق التحكم بالأزرار (منع الشيف من التعديل والحذف)
+function applyUserPermissions() {
+  // إذا كان المستخدم دور "شيف" (chef)
+  if (currentUser.role === 'chef') {
+    // إخفاء أزرار الرفع والحذف أعلى الجدول
+    const topButtons = document.querySelectorAll('.card button.btn-warning, .card button.btn-danger, input#excelInput');
+    topButtons.forEach(btn => btn.style.display = 'none');
+
+    // إخفاء أزرار التعديل والتعطيل/التفعيل داخل الجدول
+    const tableButtons = document.querySelectorAll('.btn-edit-action, .btn-status-action');
+    tableButtons.forEach(btn => btn.style.display = 'none');
+  }
+}
+
+// 5. تحميل نموذج الإكسل
 function downloadTemplate() {
   const template = [
     { 
@@ -55,7 +107,7 @@ function downloadTemplate() {
       image_url: "https://via.placeholder.com/100", 
       name_ar: "جبنة موزاريلا", 
       name_en: "Buffalo Cheese", 
-      brand: "Rudy", 
+      brand: "Rudy Pizzeria & B-Marlin", 
       category: "Cheese", 
       quantity: 36, 
       min_quantity: 18, 
@@ -68,7 +120,13 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
+// 6. معالجة ورفع ملف الإكسل
 async function handleExcelUpload(e) {
+  if (currentUser.role === 'chef') {
+    alert("عذراً، لا تملك صلاحية إضافة أو تعديل المنتجات.");
+    return;
+  }
+
   const file = e.target.files[0];
   if (!file) return;
 
@@ -84,7 +142,6 @@ async function handleExcelUpload(e) {
       let duplicates = [];
       let validRows = [];
 
-      // التحقق من التكرار وقراءة حقل category
       for (let r of rows) {
         const skuStr = String(r.sku || r.SKU || '').trim();
         if (!skuStr) continue;
@@ -100,7 +157,7 @@ async function handleExcelUpload(e) {
             image_url: r.image_url || r.Image || '',
             name_ar: r.name_ar || r['الاسم بالعربي'] || '',
             name_en: r.name_en || r['الاسم بالانجليزي'] || '',
-            brand: r.brand || r.Brand || '',
+            brand: r.brand || r.Brand || 'Rudy Pizzeria & B-Marlin',
             category: String(r.category || r.Category || r['التصنيف'] || '').trim(),
             quantity: parseInt(r.quantity || 0),
             min_quantity: parseInt(r.min_quantity || 5),
@@ -110,7 +167,7 @@ async function handleExcelUpload(e) {
       }
 
       if (duplicates.length > 0) {
-        alert(`⚠️ عذراً، تم تجاهل المنتجات المكررة التالية لتكرار رمز SKU:\n${duplicates.join(', ')}`);
+        alert(`⚠️ عذراً، تم تجاهل المنتجات المكررة لتكرار رمز SKU:\n${duplicates.join(', ')}`);
       }
 
       if (validRows.length > 0) {
@@ -131,7 +188,10 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
+// 7. فتح نافذة التعديل
 function openEditModal(id) {
+  if (currentUser.role === 'chef') return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+
   const p = products.find(x => x.id === id);
   if (!p) return;
   document.getElementById('editProdId').value = p.id;
@@ -141,7 +201,6 @@ function openEditModal(id) {
   document.getElementById('editNameEn').value = p.name_en || '';
   document.getElementById('editBrand').value = p.brand || '';
   
-  // حقل التصنيف في النافذة
   const catInput = document.getElementById('editCategory');
   if (catInput) catInput.value = p.category || '';
 
@@ -156,8 +215,11 @@ function closeModal(id) {
   if (el) el.style.display = 'none'; 
 }
 
+// 8. حفظ تعديل المنتج
 async function saveProductEdit(e) {
   e.preventDefault();
+  if (currentUser.role === 'chef') return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+
   const id = document.getElementById('editProdId').value;
   const catInput = document.getElementById('editCategory');
 
@@ -181,12 +243,17 @@ async function saveProductEdit(e) {
   }
 }
 
+// 9. تغيير حالة المنتج (تفعيل/تعطيل)
 async function toggleStatus(id, currentStatus) {
+  if (currentUser.role === 'chef') return alert("عذراً، لا تملك هذه الصلاحية.");
   await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
   loadProducts();
 }
 
+// 10. حذف المنتجات المحددة
 async function deleteSelected() {
+  if (currentUser.role === 'chef') return alert("عذراً، لا تملك صلاحية حذف المنتجات.");
+
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
   if (ids.length === 0) return alert("الرجاء تحديد منتجات لحذفها");
   if (confirm("هل أنت تأكد من حذف المنتجات المحددة؟")) {
@@ -199,6 +266,7 @@ function toggleSelectAll(master) {
   document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
 }
 
+// 11. تصدير المنتجات لإكسل
 function exportSelected() {
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
   const listToExport = ids.length > 0 ? products.filter(p => ids.includes(p.id)) : products;
