@@ -2,7 +2,6 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>طلبات التغذية</title>
   <link rel="stylesheet" href="css/style.css">
@@ -30,7 +29,7 @@
       <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
         <button class="btn" onclick="openSupplyModal()">+ طلب تغذية جديد</button>
         <div>
-          <select id="statusFilter" onchange="loadOrders()">
+          <select id="statusFilter" onchange="loadOrders()" style="padding: 6px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
             <option value="الكل">كل الحالات</option>
             <option value="جديد">جديد</option>
             <option value="جاري التجهيز">جاري التجهيز</option>
@@ -60,21 +59,38 @@
     </div>
   </div>
 
-  <!-- Modal اختيار المنتجات للطلب -->
+  <!-- Modal اختيار المنتجات للطلب مع الهيدر الثابت -->
   <div id="supplyModal" class="modal">
     <div class="modal-content">
-      <h3>إضافة طلب تغذية جديد</h3>
-      <input type="text" id="prodSearch" placeholder="بحث باسم المنتج..." oninput="filterProducts()" style="width:100%; padding:8px; margin:10px 0;">
-      <div class="grid-products" id="productsGrid"></div>
-      <button class="btn btn-secondary" style="margin-top:15px;" onclick="closeModal('supplyModal')">إغلاق</button>
+      
+      <!-- الجزء الثابت في الأعلى -->
+      <div class="modal-header-sticky">
+        <div class="modal-title-bar">
+          <h4 style="margin:0; font-weight:bold; color:var(--text-color);">إضافة طلب تغذية جديد</h4>
+          <button class="btn-close-modal" onclick="closeModal('supplyModal')">✕</button>
+        </div>
+        <input 
+          type="text" 
+          id="prodSearch" 
+          placeholder="بحث باسم المنتج أو الرمز..." 
+          oninput="filterProducts()" 
+          style="width:100%; padding:8px 12px; font-size:0.9rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
+        >
+      </div>
+
+      <!-- منطقة المنتجات المخصصة للتمرير -->
+      <div class="modal-body-scroll">
+        <div id="productsGrid"></div>
+      </div>
+
     </div>
   </div>
 
   <!-- Modal معاينة الصورة -->
-<div id="imgPreviewModal" class="img-preview-modal" onclick="closeImagePreview()">
-  <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
-  <img id="previewImageSrc" src="" alt="معاينة المنتج">
-</div>
+  <div id="imgPreviewModal" class="img-preview-modal" onclick="closeImagePreview()">
+    <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
+    <img id="previewImageSrc" src="" alt="معاينة المنتج">
+  </div>
 
   <!-- Modal السلة -->
   <div id="cartModal" class="modal">
@@ -85,8 +101,10 @@
         <label>ملاحظات الطلب:</label>
         <textarea id="orderNotes" rows="3"></textarea>
       </div>
-      <button class="btn" onclick="submitOrder()">إرسال الطلب النهائي</button>
-      <button class="btn btn-secondary" onclick="closeModal('cartModal')">إلغاء</button>
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button class="btn" style="flex: 1;" onclick="submitOrder()">إرسال الطلب النهائي</button>
+        <button class="btn btn-secondary" onclick="closeModal('cartModal')">إلغاء</button>
+      </div>
     </div>
   </div>
 
@@ -95,9 +113,8 @@
     <div class="modal-content">
       <h3>تفاصيل الطلب <span id="modalOrderNum"></span></h3>
       <div id="orderDetailsContent"></div>
-      <h4>سجل الإجراءات (Audit Log):</h4>
-      <ul class="timeline" id="orderTimeline"></ul>
-      <button class="btn btn-secondary" onclick="closeModal('orderDetailsModal')">إغلاق</button>
+      <div id="orderTimeline"></div>
+      <button class="btn btn-secondary" style="margin-top:15px;" onclick="closeModal('orderDetailsModal')">إغلاق</button>
     </div>
   </div>
 
