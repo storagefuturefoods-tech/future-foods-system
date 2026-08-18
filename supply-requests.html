@@ -59,23 +59,33 @@
     </div>
   </div>
 
-  <!-- Modal اختيار المنتجات للطلب مع الهيدر الثابت -->
+  <!-- Modal اختيار المنتجات للطلب -->
   <div id="supplyModal" class="modal">
     <div class="modal-content">
       
-      <!-- الجزء الثابت في الأعلى -->
+      <!-- الهيدر الثابت المطور ليشمل فلاتر البراند والتصنيف والبحث -->
       <div class="modal-header-sticky">
         <div class="modal-title-bar">
           <h4 style="margin:0; font-weight:bold; color:var(--text-color);">إضافة طلب تغذية جديد</h4>
           <button class="btn-close-modal" onclick="closeModal('supplyModal')">✕</button>
         </div>
-        <input 
-          type="text" 
-          id="prodSearch" 
-          placeholder="بحث باسم المنتج أو الرمز..." 
-          oninput="filterProducts()" 
-          style="width:100%; padding:8px 12px; font-size:0.9rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
-        >
+        
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input 
+            type="text" 
+            id="prodSearch" 
+            placeholder="بحث باسم المنتج أو الرمز..." 
+            oninput="filterProducts()" 
+            style="flex: 2; min-width: 150px; padding:8px 10px; font-size:0.85rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
+          >
+          <select 
+            id="categoryFilter" 
+            onchange="filterProducts()" 
+            style="flex: 1; min-width: 120px; padding:8px 10px; font-size:0.85rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
+          >
+            <option value="ALL">كل التصنيفات</option>
+          </select>
+        </div>
       </div>
 
       <!-- منطقة المنتجات المخصصة للتمرير -->
@@ -108,7 +118,7 @@
     </div>
   </div>
 
-  <!-- Modal تفاصيل الطلب و سجل التعديلات -->
+  <!-- Modal تفاصيل الطلب -->
   <div id="orderDetailsModal" class="modal">
     <div class="modal-content">
       <h3>تفاصيل الطلب <span id="modalOrderNum"></span></h3>
