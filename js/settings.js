@@ -1,4 +1,21 @@
 let usersList = [];
+let currentUser = {};
+
+async function initSettings() {
+  // جلب بيانات المستخدم المسجل حالياً من localStorage
+  currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  // حماية الصفحة: إذا لم يكن أدمن، لا يمكنه الوصول لزر الإضافة أو أزرار التعديل
+  const isSuperAdmin = (currentUser.email === 'storage.futurefoods@gmail.com' || currentUser.role === 'admin');
+
+  // إخفاء زر إضافة مستخدم إذا لم يكن أدمن
+  const addBtn = document.querySelector('button[onclick*="userModal"]');
+  if (addBtn && !isSuperAdmin) {
+    addBtn.style.display = 'none';
+  }
+
+  await loadUsers();
+}
 
 async function loadUsers() {
   const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
@@ -15,6 +32,14 @@ function renderUsersTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  const isSuperAdmin = (currentUser.email === 'storage.futurefoods@gmail.com' || currentUser.role === 'admin');
+
+  // إخفاء رأس عمود الإجراءات إذا لم يكن المستخدم أدمن
+  const actionsHeader = document.querySelector('table th:last-child');
+  if (actionsHeader) {
+    actionsHeader.style.display = isSuperAdmin ? '' : 'none';
+  }
+
   usersList.forEach(u => {
     let roleBadge = '';
     if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;">مدير النظام</span>';
@@ -27,22 +52,29 @@ function renderUsersTable() {
     else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ المشترك)';
     else brandDisplay = u.brand_permission || 'غير محدد';
 
+    const actionsTd = isSuperAdmin ? `
+      <td>
+        <button class="btn" style="padding:3px 8px; font-size:0.8rem;" onclick="openEditUser(${u.id})">تعديل</button>
+        <button class="btn btn-danger" style="padding:3px 8px; font-size:0.8rem;" onclick="deleteUser(${u.id})">حذف</button>
+      </td>
+    ` : '';
+
     tbody.innerHTML += `
       <tr>
         <td>${u.name || '-'}</td>
         <td>${u.email || '-'}</td>
         <td>${roleBadge}</td>
         <td><strong>${brandDisplay}</strong></td>
-        <td>
-          <button class="btn" style="padding:3px 8px; font-size:0.8rem;" onclick="openEditUser(${u.id})">تعديل</button>
-          <button class="btn btn-danger" style="padding:3px 8px; font-size:0.8rem;" onclick="deleteUser(${u.id})">حذف</button>
-        </td>
+        ${actionsTd}
       </tr>
     `;
   });
 }
 
 function openModal(modalId) {
+  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
+    return alert("عذراً، لا تملك صلاحية إضافة مستخدمين.");
+  }
   document.getElementById('uId').value = '';
   document.getElementById('uName').value = '';
   document.getElementById('uEmail').value = '';
@@ -56,6 +88,9 @@ function openModal(modalId) {
 }
 
 function openEditUser(id) {
+  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
+    return alert("عذراً، لا تملك صلاحية تعديل المستخدمين.");
+  }
   const u = usersList.find(x => x.id === id);
   if (!u) return;
 
@@ -63,7 +98,7 @@ function openEditUser(id) {
   document.getElementById('uName').value = u.name;
   document.getElementById('uEmail').value = u.email;
   document.getElementById('uPass').value = '';
-  document.getElementById('uPass').required = false; // لا يشترط كلمة سر عند التعديل
+  document.getElementById('uPass').required = false;
   document.getElementById('passGroup').style.display = 'none';
   document.getElementById('uRole').value = u.role || 'chef';
   document.getElementById('uBrand').value = u.brand_permission || 'All';
@@ -79,6 +114,10 @@ function closeModal(modalId) {
 
 async function saveUser(e) {
   e.preventDefault();
+  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
+    return alert("عذراً، لا تملك الصلاحية للقيام بهذا الإجراء.");
+  }
+
   const id = document.getElementById('uId').value;
   const name = document.getElementById('uName').value;
   const email = document.getElementById('uEmail').value;
@@ -87,7 +126,6 @@ async function saveUser(e) {
   const brand_permission = document.getElementById('uBrand').value;
 
   if (id) {
-    // تعديل مستخدم موجود
     const { error } = await _supabase.from('users').update({
       name,
       email,
@@ -102,7 +140,6 @@ async function saveUser(e) {
       loadUsers();
     }
   } else {
-    // إضافة مستخدم جديد
     const { error } = await _supabase.from('users').insert([{
       name,
       email,
@@ -121,10 +158,13 @@ async function saveUser(e) {
 }
 
 async function deleteUser(id) {
+  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
+    return alert("عذراً، لا تملك صلاحية الحذف.");
+  }
   if (!confirm("هل أنت تأكد من حذف هذا المستخدم؟")) return;
   const { error } = await _supabase.from('users').delete().eq('id', id);
   if (error) alert("حدث خطأ أثناء الحذف: " + error.message);
   else loadUsers();
 }
 
-document.addEventListener('DOMContentLoaded', loadUsers);
+document.addEventListener('DOMContentLoaded', initSettings);
