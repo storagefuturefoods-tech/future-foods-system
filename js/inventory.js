@@ -9,6 +9,7 @@ async function loadProducts() {
 
 function renderTable() {
   const tbody = document.getElementById('inventoryBody');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   products.forEach(p => {
@@ -16,13 +17,14 @@ function renderTable() {
     tbody.innerHTML += `
       <tr style="${isLow ? 'background-color: #ffe6e6;' : ''}">
         <td><input type="checkbox" class="prod-select" value="${p.id}"></td>
-        <td><img src="${p.image_url || 'https://via.placeholder.com/50'}" width="40" height="40"></td>
-        <td>${p.sku}</td>
-        <td>${p.name_ar}</td>
-        <td>${p.name_en}</td>
-        <td>${p.brand}</td>
+        <td><img src="${p.image_url || 'https://via.placeholder.com/50'}" width="40" height="40" style="object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/40'"></td>
+        <td>${p.sku || '-'}</td>
+        <td>${p.name_ar || '-'}</td>
+        <td>${p.name_en || '-'}</td>
+        <td>${p.brand || '-'}</td>
+        <td><span style="background:var(--input-bg, #eee); padding:2px 6px; border-radius:4px; font-size:0.85rem;">${p.category || '-'}</span></td>
         <td>${p.quantity} ${isLow ? '⚠️' : ''}</td>
-        <td>${p.items_per_box}</td>
+        <td>${p.items_per_box || 1}</td>
         <td>${p.is_disabled ? 'معطل' : 'نشط'}</td>
         <td>
           <button class="btn" onclick="openEditModal(${p.id})">تعديل</button>
@@ -37,61 +39,95 @@ function renderTable() {
 
 function downloadTemplate() {
   const template = [
-    { sku: "SKU101", image_url: "https://via.placeholder.com/100", name_ar: "منتج 1", name_en: "Product 1", brand: "Rudy", quantity: 50, min_quantity: 5, items_per_box: 12 }
+    { 
+      sku: "712211", 
+      image_url: "https://via.placeholder.com/100", 
+      name_ar: "بطاطس حلوة مقلية", 
+      name_en: "Sweet fries", 
+      brand: "Rudy", 
+      category: "Vegetables", 
+      quantity: 15, 
+      min_quantity: 11, 
+      items_per_box: 1 
+    },
+    { 
+      sku: "712218", 
+      image_url: "https://via.placeholder.com/100", 
+      name_ar: "جبنة موزاريلا", 
+      name_en: "Buffalo Cheese", 
+      brand: "Rudy", 
+      category: "Cheese", 
+      quantity: 36, 
+      min_quantity: 18, 
+      items_per_box: 12 
+    }
   ];
   const ws = XLSX.utils.json_to_sheet(template);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Template");
+  XLSX.utils.book_append_sheet(wb, ws, "Products_Template");
   XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
 async function handleExcelUpload(e) {
   const file = e.target.files[0];
+  if (!file) return;
+
   const reader = new FileReader();
   
   reader.onload = async (evt) => {
-    const data = new Uint8Array(evt.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet);
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
 
-    let duplicates = [];
-    let validRows = [];
+      let duplicates = [];
+      let validRows = [];
 
-    // التحقق من التكرار
-    for (let r of rows) {
-      const existsLocally = validRows.some(x => x.sku === r.sku);
-      const existsInDB = products.some(x => x.sku === String(r.sku));
+      // التحقق من التكرار وقراءة حقل category
+      for (let r of rows) {
+        const skuStr = String(r.sku || r.SKU || '').trim();
+        if (!skuStr) continue;
 
-      if (existsLocally || existsInDB) {
-        duplicates.push(r.sku);
-      } else {
-        validRows.push({
-          sku: String(r.sku),
-          image_url: r.image_url || '',
-          name_ar: r.name_ar,
-          name_en: r.name_en,
-          brand: r.brand,
-          quantity: r.quantity || 0,
-          min_quantity: r.min_quantity || 5,
-          items_per_box: r.items_per_box || 1
-        });
+        const existsLocally = validRows.some(x => x.sku === skuStr);
+        const existsInDB = products.some(x => x.sku === skuStr);
+
+        if (existsLocally || existsInDB) {
+          duplicates.push(skuStr);
+        } else {
+          validRows.push({
+            sku: skuStr,
+            image_url: r.image_url || r.Image || '',
+            name_ar: r.name_ar || r['الاسم بالعربي'] || '',
+            name_en: r.name_en || r['الاسم بالانجليزي'] || '',
+            brand: r.brand || r.Brand || '',
+            category: String(r.category || r.Category || r['التصنيف'] || '').trim(),
+            quantity: parseInt(r.quantity || 0),
+            min_quantity: parseInt(r.min_quantity || 5),
+            items_per_box: parseInt(r.items_per_box || r.box_capacity || 1)
+          });
+        }
       }
-    }
 
-    if (duplicates.length > 0) {
-      alert(`⚠️ عذراً، تم تجاهل المنتجات المكررة التالية لتكرار رمز SKU:\n${duplicates.join(', ')}`);
-    }
-
-    if (validRows.length > 0) {
-      const { error } = await _supabase.from('products').insert(validRows);
-      if (error) alert("خطأ أثناء إدخال البيانات: " + error.message);
-      else {
-        alert("تم رفع المنتجات بنجاح!");
-        loadProducts();
+      if (duplicates.length > 0) {
+        alert(`⚠️ عذراً، تم تجاهل المنتجات المكررة التالية لتكرار رمز SKU:\n${duplicates.join(', ')}`);
       }
+
+      if (validRows.length > 0) {
+        const { error } = await _supabase.from('products').insert(validRows);
+        if (error) {
+          alert("خطأ أثناء إدخال البيانات: " + error.message);
+        } else {
+          alert(`تم رفع ${validRows.length} منتج بنجاح!`);
+          loadProducts();
+        }
+      }
+    } catch (err) {
+      alert("حدث خطأ في قراءة ملف الإكسل: " + err.message);
     }
+    e.target.value = '';
   };
+  
   reader.readAsArrayBuffer(file);
 }
 
@@ -99,35 +135,47 @@ function openEditModal(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
   document.getElementById('editProdId').value = p.id;
-  document.getElementById('editImage').value = p.image_url;
-  document.getElementById('editSku').value = p.sku;
-  document.getElementById('editNameAr').value = p.name_ar;
-  document.getElementById('editNameEn').value = p.name_en;
-  document.getElementById('editBrand').value = p.brand;
-  document.getElementById('editQty').value = p.quantity;
-  document.getElementById('editMinQty').value = p.min_quantity;
-  document.getElementById('editBoxCap').value = p.items_per_box;
+  document.getElementById('editImage').value = p.image_url || '';
+  document.getElementById('editSku').value = p.sku || '';
+  document.getElementById('editNameAr').value = p.name_ar || '';
+  document.getElementById('editNameEn').value = p.name_en || '';
+  document.getElementById('editBrand').value = p.brand || '';
+  
+  // حقل التصنيف في النافذة
+  const catInput = document.getElementById('editCategory');
+  if (catInput) catInput.value = p.category || '';
+
+  document.getElementById('editQty').value = p.quantity || 0;
+  document.getElementById('editMinQty').value = p.min_quantity || 0;
+  document.getElementById('editBoxCap').value = p.items_per_box || 1;
   document.getElementById('editModal').style.display = 'flex';
 }
 
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModal(id) { 
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none'; 
+}
 
 async function saveProductEdit(e) {
   e.preventDefault();
   const id = document.getElementById('editProdId').value;
+  const catInput = document.getElementById('editCategory');
+
   const updated = {
     image_url: document.getElementById('editImage').value,
     name_ar: document.getElementById('editNameAr').value,
     name_en: document.getElementById('editNameEn').value,
     brand: document.getElementById('editBrand').value,
+    category: catInput ? catInput.value.trim() : '',
     quantity: parseInt(document.getElementById('editQty').value),
     min_quantity: parseInt(document.getElementById('editMinQty').value),
     items_per_box: parseInt(document.getElementById('editBoxCap').value)
   };
 
   const { error } = await _supabase.from('products').update(updated).eq('id', id);
-  if (error) alert("خطأ في التعديل: " + error.message);
-  else {
+  if (error) {
+    alert("خطأ في التعديل: " + error.message);
+  } else {
     closeModal('editModal');
     loadProducts();
   }
