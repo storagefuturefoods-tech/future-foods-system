@@ -1,70 +1,60 @@
 let usersList = [];
-let currentUser = {};
+let settingsCurrentUser = {};
 
 async function initSettings() {
-  console.log("بداية تحميل صفحة الإعدادات...");
-  
-  // 1. جلب المستخدم الحالي
+  console.log("بداية تشغيل الإعدادات...");
+
+  // جلب المستخدم الحالي دون التعارض مع الملفات الأخرى
   try {
-    currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    settingsCurrentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
   } catch (e) {
-    currentUser = {};
+    settingsCurrentUser = {};
   }
 
-  // 2. جلب وتعبئة جدول المستخدمين
   await loadUsers();
 }
 
 async function loadUsers() {
-  // جلب كافة بيانات الجدول مباشرة
   const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
 
   if (error) {
-    console.error("خطأ Supabase:", error);
-    alert("حدث خطأ في جلب البيانات: " + error.message);
+    console.error("خطأ جلب المستخدمين:", error);
+    alert("خطأ في جلب المستخدمين: " + error.message);
     return;
   }
 
-  console.log("البيانات المسترجعة من Supabase:", data);
   usersList = data || [];
   renderUsersTable();
 }
 
 function renderUsersTable() {
-  // البحث عن عنصر tbody الخاص بالجدول
   let tbody = document.getElementById('usersBody');
-  
-  // إذا لم يجد id="usersBody"، يبحث عن أول tbody في الجدول مباشرة
   if (!tbody) {
     tbody = document.querySelector('table tbody');
   }
 
-  if (!tbody) {
-    console.error("لم يتم العثور على عنصر tbody في الصفحة!");
-    return;
-  }
-
+  if (!tbody) return;
   tbody.innerHTML = '';
 
-  // التحقق من الصلاحيات للإظهار والتعديل
-  const isSuperAdmin = !currentUser.email || 
-                       currentUser.email === 'storage.futurefoods@gmail.com' || 
-                       currentUser.role === 'admin';
+  // فحص صلاحيات الأدمن
+  const isSuperAdmin = !settingsCurrentUser.email || 
+                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
+                       settingsCurrentUser.role === 'admin';
 
-  // زر الإضافة
-  const addBtn = document.querySelector('button[onclick*="userModal"]') || document.querySelector('button[onclick*="openModal"]');
+  // إخفاء أو إظهار زر إضافة مستخدم
+  const addBtn = document.querySelector('button[onclick*="openModal"]');
   if (addBtn) {
     addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
   }
 
-  // رأس عمود الإجراءات
+  // إخفاء أو إظهار رأس عمود الإجراءات
   const actionsHeader = document.querySelector('table th:last-child');
-  if (actionsHeader && actionsHeader.innerText.includes('إجراءات')) {
+  if (actionsHeader) {
     actionsHeader.style.display = isSuperAdmin ? '' : 'none';
   }
 
   if (usersList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#888;">لا يوجد مستخدمون حتى الآن</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">لا يوجد مستخدمون حالياً</td></tr>';
     return;
   }
 
@@ -86,15 +76,15 @@ function renderUsersTable() {
       </td>
     ` : '';
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${u.name || '-'}</td>
-      <td>${u.email || '-'}</td>
-      <td>${roleBadge}</td>
-      <td><strong>${brandDisplay}</strong></td>
-      ${actionsTd}
+    tbody.innerHTML += `
+      <tr>
+        <td>${u.name || '-'}</td>
+        <td>${u.email || '-'}</td>
+        <td>${roleBadge}</td>
+        <td><strong>${brandDisplay}</strong></td>
+        ${actionsTd}
+      </tr>
     `;
-    tbody.appendChild(tr);
   });
 }
 
@@ -190,7 +180,7 @@ async function deleteUser(id) {
   else loadUsers();
 }
 
-// التشغيل المباشر عند استدعاء الملف أو تحميل الصفحة
+// التشغيل المباشر عند التحميل
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initSettings);
 } else {
