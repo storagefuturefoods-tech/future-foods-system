@@ -46,6 +46,7 @@
             <th>الاسم (عربي)</th>
             <th>الاسم (En)</th>
             <th>البراند</th>
+            <th>التصنيف</th>
             <th>الكمية</th>
             <th>سعة الكرتون</th>
             <th>الحالة</th>
@@ -68,10 +69,11 @@
         <div class="form-group"><label>الاسم بالعربي</label><input type="text" id="editNameAr" required></div>
         <div class="form-group"><label>الاسم بالإنكليزي</label><input type="text" id="editNameEn" required></div>
         <div class="form-group"><label>البراند</label><input type="text" id="editBrand" required></div>
+        <div class="form-group"><label>التصنيف (Category)</label><input type="text" id="editCategory" placeholder="مثال: Cheese, Sauces, Oils"></div>
         <div class="form-group"><label>الكمية بالحبة</label><input type="number" id="editQty" required></div>
         <div class="form-group"><label>الحد الأدنى للتنبيه</label><input type="number" id="editMinQty" required></div>
         <div class="form-group"><label>عدد الحبات بالكرتون</label><input type="number" id="editBoxCap" required></div>
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:10px; margin-top:15px;">
           <button type="submit" class="btn">حفظ التعديلات</button>
           <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">إلغاء</button>
         </div>
