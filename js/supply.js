@@ -2,7 +2,6 @@ let availableProducts = [];
 let cart = [];
 let ordersList = [];
 
-// جلب اسم الموظف الفعلي بدلاً من المسمى الوظيفي
 function getEmployeeName() {
   if (typeof currentUser !== 'undefined' && currentUser) {
     return currentUser.name || currentUser.full_name || currentUser.user_name || currentUser.email || 'Admin';
@@ -10,7 +9,6 @@ function getEmployeeName() {
   return 'Admin';
 }
 
-// دوال معاينة الصورة
 function previewImage(src, altText) {
   let modal = document.getElementById('imgPreviewModal');
   let img = document.getElementById('previewImageSrc');
@@ -37,12 +35,10 @@ function previewImage(src, altText) {
 
 function closeImagePreview() {
   const modal = document.getElementById('imgPreviewModal');
-  if (modal) {
-    modal.style.display = 'none';
-  }
+  if (modal) modal.style.display = 'none';
 }
 
-// 1. فتح نافذة الطلب وجلب المنتجات المتاحة
+// 1. فتح نافذة الطلب وجلب المنتجات والتصنيفات
 async function openSupplyModal() {
   const { data, error } = await _supabase
     .from('products')
@@ -67,18 +63,34 @@ async function openSupplyModal() {
     return p.brand && p.brand.trim().toLowerCase() === userBrand.trim().toLowerCase();
   });
 
+  // تعبئة قائمة التصنيفات ديناميكياً
+  populateCategoriesDropdown(availableProducts);
+
   renderProductsGrid(availableProducts);
   openModal('supplyModal');
 }
 
-// 2. عرض شبكة المنتجات بتنسيق مصغر وأنيق
+// استخراج كافة التصنيفات المتاحة وتعبئتها في القائمة
+function populateCategoriesDropdown(products) {
+  const catSelect = document.getElementById('categoryFilter');
+  if (!catSelect) return;
+
+  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
+  
+  catSelect.innerHTML = '<option value="ALL">كل التصنيفات</option>';
+  categories.forEach(cat => {
+    catSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+  });
+}
+
+// 2. عرض شبكة المنتجات
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
   grid.innerHTML = '';
 
   if (prods.length === 0) {
-    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">لا توجد منتجات متاحة لهذا البراند حالياً.</p>';
+    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">لا توجد منتجات مطابقة للبحث أو التصنيف.</p>';
     return;
   }
 
@@ -112,7 +124,7 @@ function renderProductsGrid(prods) {
           onerror="this.src='https://via.placeholder.com/100'"
         >
         <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.75rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
-        <p style="font-size:0.65rem; color:var(--text-muted); margin: 1px 0;">${p.brand || ''}</p>
+        <p style="font-size:0.65rem; color:var(--text-muted); margin: 1px 0;">${p.category || p.brand || ''}</p>
         <p style="font-size:0.7rem; margin: 2px 0 5px 0;">المتوفر: <strong>${p.quantity}</strong></p>
         <button style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
           ${btnText}
@@ -122,41 +134,43 @@ function renderProductsGrid(prods) {
   });
 }
 
-// 3. محرك البحث الفوري عن المنتجات
+// 3. فلترة المنتجات بالاسم والتصنيف المختار
 function filterProducts() {
   const query = (document.getElementById('prodSearch')?.value || '').toLowerCase();
+  const selectedCat = document.getElementById('categoryFilter')?.value || 'ALL';
+
   const filtered = availableProducts.filter(p => {
     const nameAr = (p.name_ar || '').toLowerCase();
     const nameEn = (p.name_en || '').toLowerCase();
     const sku = (p.sku || '').toLowerCase();
-    return nameAr.includes(query) || nameEn.includes(query) || sku.includes(query);
+    
+    const matchesSearch = nameAr.includes(query) || nameEn.includes(query) || sku.includes(query);
+    const matchesCategory = selectedCat === 'ALL' || p.category === selectedCat;
+
+    return matchesSearch && matchesCategory;
   });
+
   renderProductsGrid(filtered);
 }
 
-// 4. إضافة منتج للسلة وتحديث الزر
 function addToCart(prodId) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
 
-  const inCart = cart.find(item => item.id === prodId);
-
-  if (!inCart) {
+  if (!cart.some(item => item.id === prodId)) {
     cart.push({ ...prod, reqQty: 1 });
   }
   
   updateCartBadge();
-  renderProductsGrid(availableProducts);
+  filterProducts();
 }
 
-// 5. تحديث عداد السلة والشكل
 function updateCartBadge() {
   const badge = document.getElementById('cartCount');
   if (badge) badge.innerText = cart.length;
   renderCart();
 }
 
-// 6. عرض قائمة السلة
 function renderCart() {
   const container = document.getElementById('cartItemsList');
   if (!container) return;
@@ -173,7 +187,7 @@ function renderCart() {
       <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="flex:1;">
           <strong style="font-size:0.9rem;">${name}</strong><br>
-          <small style="color:var(--text-muted);">الكرتون به: ${item.items_per_box || 1} حبة | المتوفر: ${item.quantity}</small>
+          <small style="color:var(--text-muted);">التصنيف: ${item.category || '-'} | المتوفر: ${item.quantity}</small>
         </div>
         <input 
           type="number" 
@@ -207,10 +221,9 @@ function changeCartQty(index, val) {
 function removeFromCart(index) { 
   cart.splice(index, 1); 
   updateCartBadge(); 
-  renderProductsGrid(availableProducts);
+  filterProducts();
 }
 
-// 7. إرسال الطلب النهائي مع الفحص الشامل للكميات
 async function submitOrder() {
   if (cart.length === 0) return alert("السلة فارغة!");
 
@@ -268,7 +281,6 @@ async function submitOrder() {
   loadOrders();
 }
 
-// 8. تحميل الطلبات وعرضها في الجدول
 async function loadOrders() {
   const filter = document.getElementById('statusFilter')?.value || 'الكل';
   let query = _supabase.from('orders').select('*').order('id', { ascending: false });
@@ -313,7 +325,6 @@ async function loadOrders() {
   });
 }
 
-// 9. تغيير حالة الطلب وتحديث السجل الزمني
 async function updateOrderStatus(orderId, newStatus) {
   const empName = getEmployeeName();
   await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
@@ -325,7 +336,6 @@ async function updateOrderStatus(orderId, newStatus) {
   loadOrders();
 }
 
-// 10. عرض تفاصيل الطلب وسجل الأحداث
 async function viewOrderDetails(orderId) {
   const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
   const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
@@ -400,7 +410,6 @@ async function viewOrderDetails(orderId) {
   openModal('orderDetailsModal');
 }
 
-// 11. تصدير الطلبات
 function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
   const listToExport = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
