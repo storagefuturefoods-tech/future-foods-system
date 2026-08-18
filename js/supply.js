@@ -15,7 +15,6 @@ function previewImage(src, altText) {
   let modal = document.getElementById('imgPreviewModal');
   let img = document.getElementById('previewImageSrc');
   
-  // إنشاء العنصر تلقائياً إن لم يكن موجوداً في HTML
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'imgPreviewModal';
@@ -72,7 +71,7 @@ async function openSupplyModal() {
   openModal('supplyModal');
 }
 
-// 2. عرض شبكة المنتجات بتصميم متجاوب ومعاينة الصورة عند النقر
+// 2. عرض شبكة المنتجات بتنسيق مصغر وأنيق
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
@@ -86,20 +85,21 @@ function renderProductsGrid(prods) {
   prods.forEach(p => {
     const isOutOfStock = p.quantity <= 0;
     const isInCart = cart.some(item => item.id === p.id);
-    const name = currentLang === 'ar' ? p.name_ar : p.name_en;
-    const imgUrl = p.image_url || 'https://via.placeholder.com/150';
+    const name = typeof currentLang !== 'undefined' && currentLang === 'ar' ? p.name_ar : p.name_en;
+    const imgUrl = p.image_url || 'https://via.placeholder.com/100';
 
-    // تحديد حالة الزر والشكل
     let btnDisabled = isOutOfStock || isInCart;
-    let btnText = 'إضافة للسلة';
-    let btnStyle = 'width: 100%; padding: 6px 4px; font-size: 0.85rem;';
+    let btnText = 'إضافة';
+    let btnStyle = 'width: 100%; padding: 4px 2px; font-size: 0.72rem; border-radius: 4px; border: none; font-weight: bold; cursor: pointer;';
 
     if (isOutOfStock) {
       btnText = 'مخلص';
-      btnStyle += ' background: #555; cursor: not-allowed; opacity: 0.6;';
+      btnStyle += ' background: #555; color: #ccc; cursor: not-allowed; opacity: 0.6;';
     } else if (isInCart) {
-      btnText = 'تمت الإضافة ✔';
-      btnStyle += ' background: #4A5568; cursor: not-allowed; opacity: 0.7;';
+      btnText = 'تمت ✔';
+      btnStyle += ' background: #4A5568; color: #fff; cursor: not-allowed; opacity: 0.8;';
+    } else {
+      btnStyle += ' background: var(--primary-color, #2e7d32); color: #fff;';
     }
     
     grid.innerHTML += `
@@ -109,12 +109,12 @@ function renderProductsGrid(prods) {
           alt="${name}" 
           title="اضغط للتكبير والمعاينة"
           onclick="previewImage('${imgUrl}', '${name}')"
-          onerror="this.src='https://via.placeholder.com/150'"
+          onerror="this.src='https://via.placeholder.com/100'"
         >
-        <h6 style="margin: 8px 0 4px 0; color: var(--text-color); font-size: 0.85rem; line-height: 1.2; font-weight: 600; min-height: 32px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${name}</h6>
-        <p style="font-size:0.75rem; color:var(--text-muted); margin: 2px 0;">${p.brand}</p>
-        <p style="font-size:0.8rem; margin: 4px 0 8px 0;">المتوفر: <strong>${p.quantity}</strong> حبة</p>
-        <button class="btn" style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
+        <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.75rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
+        <p style="font-size:0.65rem; color:var(--text-muted); margin: 1px 0;">${p.brand || ''}</p>
+        <p style="font-size:0.7rem; margin: 2px 0 5px 0;">المتوفر: <strong>${p.quantity}</strong></p>
+        <button style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
           ${btnText}
         </button>
       </div>
@@ -156,7 +156,7 @@ function updateCartBadge() {
   renderCart();
 }
 
-// 6. عرض قائمة السلة (مع ضبط الخط 16px والمحاذاة لمنع الزوم وانزياح المؤشر)
+// 6. عرض قائمة السلة
 function renderCart() {
   const container = document.getElementById('cartItemsList');
   if (!container) return;
@@ -168,12 +168,12 @@ function renderCart() {
   }
 
   cart.forEach((item, index) => {
-    const name = currentLang === 'ar' ? item.name_ar : item.name_en;
+    const name = typeof currentLang !== 'undefined' && currentLang === 'ar' ? item.name_ar : item.name_en;
     container.innerHTML += `
       <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="flex:1;">
-          <strong>${name}</strong><br>
-          <small style="color:var(--text-muted);">الكرتون به: ${item.items_per_box} حبة | المتوفر: ${item.quantity}</small>
+          <strong style="font-size:0.9rem;">${name}</strong><br>
+          <small style="color:var(--text-muted);">الكرتون به: ${item.items_per_box || 1} حبة | المتوفر: ${item.quantity}</small>
         </div>
         <input 
           type="number" 
@@ -215,7 +215,7 @@ async function submitOrder() {
   if (cart.length === 0) return alert("السلة فارغة!");
 
   for (let item of cart) {
-    const prodName = currentLang === 'ar' ? item.name_ar : item.name_en;
+    const prodName = typeof currentLang !== 'undefined' && currentLang === 'ar' ? item.name_ar : item.name_en;
     if (!item.reqQty || item.reqQty <= 0) {
       return alert(`خطأ: كمية المنتج (${prodName}) لا يمكن أن تكون صفر أو أقل!`);
     }
@@ -233,8 +233,8 @@ async function submitOrder() {
     .insert([{
       order_number: orderNum,
       user_name: empName,
-      user_email: currentUser.email,
-      brand: currentUser.brand_permission || currentUser.brand,
+      user_email: currentUser ? currentUser.email : '',
+      brand: currentUser ? (currentUser.brand_permission || currentUser.brand) : '',
       total_items: cart.length,
       notes: notes,
       status: 'جديد'
@@ -247,7 +247,7 @@ async function submitOrder() {
   const orderItems = cart.map(c => ({
     order_id: newOrder.id,
     product_sku: c.sku,
-    product_name: currentLang === 'ar' ? c.name_ar : c.name_en,
+    product_name: typeof currentLang !== 'undefined' && currentLang === 'ar' ? c.name_ar : c.name_en,
     image_url: c.image_url,
     quantity_pieces: c.reqQty,
     box_capacity: c.items_per_box
@@ -294,8 +294,8 @@ async function loadOrders() {
       <tr>
         <td><input type="checkbox" class="order-select" value="${o.id}"></td>
         <td><a href="#" style="color:var(--primary-color); font-weight:bold;" onclick="viewOrderDetails(${o.id}); return false;">${o.order_number}</a></td>
-        <td>${o.user_name}</td>
-        <td>${o.brand}</td>
+        <td>${o.user_name || '-'}</td>
+        <td>${o.brand || '-'}</td>
         <td>${o.total_items}</td>
         <td>
           <select onchange="updateOrderStatus(${o.id}, this.value)" style="padding:4px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:4px;">
