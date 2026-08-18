@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الإعدادات</title>
+  <title>الإعدادات - إدارة المستخدمين</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
-    <h1>إعدادات النظام</h1>
+    <h1>إدارة المستخدمين والصلاحيات</h1>
     <nav>
       <a href="index.html">الرئيسية</a>
       <a href="inventory.html">المخزون</a>
@@ -24,23 +24,19 @@
 
   <div class="container">
     <div class="card">
-      <h3>بيانات النظام الأساسية</h3>
-      <p><strong>اسم المنشأة:</strong> مخزن مستقبل الأطعمة</p>
-      <p><strong>البريد الإلكتروني:</strong> storage.futurefoods@gmail.com</p>
-      <p><strong>العنوان:</strong> العليا شارع موسى بن نصير</p>
-    </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3>قائمة المستخدمين والصلاحيات</h3>
+        <button class="btn" onclick="openModal('userModal')">+ إضافة مستخدم جديد</button>
+      </div>
 
-    <div class="card">
-      <h3>إدارة المستخدمين والصلاحيات</h3>
-      <button class="btn" style="margin-bottom:15px;" onclick="openModal('userModal')">+ إضافة مستخدم جديد</button>
-      
       <table>
         <thead>
           <tr>
             <th>الاسم</th>
             <th>البريد الإلكتروني</th>
-            <th>المسمى الوظيفي</th>
+            <th>نوع الصلاحية (الدور)</th>
             <th>صلاحية الفرع / البراند</th>
+            <th>إجراءات</th>
           </tr>
         </thead>
         <tbody id="usersBody"></tbody>
@@ -48,24 +44,38 @@
     </div>
   </div>
 
+  <!-- Modal إضافة / تعديل مستخدم -->
   <div id="userModal" class="modal">
     <div class="modal-content">
-      <h3>إضافة مستخدم جديد</h3>
-      <form onsubmit="saveUser(event)">
+      <h3 id="modalTitle">إضافة مستخدم جديد</h3>
+      <form onsubmit="saveUser(event)" style="margin-top:15px;">
+        <input type="hidden" id="uId">
         <div class="form-group"><label>الاسم الكامل</label><input type="text" id="uName" required></div>
         <div class="form-group"><label>البريد الإلكتروني</label><input type="email" id="uEmail" required></div>
-        <div class="form-group"><label>كلمة السر المؤقتة</label><input type="password" id="uPass" required></div>
-        <div class="form-group"><label>المسمى الوظيفي</label><input type="text" id="uRole" required></div>
+        <div class="form-group" id="passGroup"><label>كلمة السر المؤقتة</label><input type="password" id="uPass"></div>
+        
         <div class="form-group">
-          <label>صلاحية البراند</label>
-          <select id="uBrand" required>
-            <option value="B-marlin">B-marlin</option>
-            <option value="Rudy">Rudy</option>
-            <option value="Rudy Pizzeria & B-Marlin">Rudy Pizzeria & B-Marlin</option>
+          <label>نوع الصلاحية في النظام</label>
+          <select id="uRole" required>
+            <option value="admin">مدير النظام (تحكم كامل + تعديل مخزون وطلبات)</option>
+            <option value="store_manager">مدير مخزن (تعديل وتغذية المخزون + الموافقة على الطلبات)</option>
+            <option value="chef">شيف / فرع (إنشاء طلبات تغذية فقط دون تعديل المخزون)</option>
           </select>
         </div>
-        <button type="submit" class="btn">حفظ المستخدم</button>
-        <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">إلغاء</button>
+
+        <div class="form-group">
+          <label>صلاحية البراند / الفرع</label>
+          <select id="uBrand" required>
+            <option value="All">كل الفروع (Rudy + B-marlin + المشترك)</option>
+            <option value="Rudy">Rudy (يشمل منتجات Rudy والمشترك)</option>
+            <option value="B-marlin">B-marlin (يشمل منتجات B-marlin والمشترك)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:15px;">
+          <button type="submit" class="btn">حفظ البيانات</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">إلغاء</button>
+        </div>
       </form>
     </div>
   </div>
