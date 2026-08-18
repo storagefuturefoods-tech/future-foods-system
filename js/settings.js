@@ -3,26 +3,25 @@ let currentUser = {};
 
 async function initSettings() {
   // جلب بيانات المستخدم المسجل حالياً من localStorage
-  currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-
-  // حماية الصفحة: إذا لم يكن أدمن، لا يمكنه الوصول لزر الإضافة أو أزرار التعديل
-  const isSuperAdmin = (currentUser.email === 'storage.futurefoods@gmail.com' || currentUser.role === 'admin');
-
-  // إخفاء زر إضافة مستخدم إذا لم يكن أدمن
-  const addBtn = document.querySelector('button[onclick*="userModal"]');
-  if (addBtn && !isSuperAdmin) {
-    addBtn.style.display = 'none';
+  try {
+    currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  } catch (e) {
+    currentUser = {};
   }
 
+  // تحميل واستعراض المستخدمين فوراً
   await loadUsers();
 }
 
 async function loadUsers() {
   const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
+  
   if (error) {
+    console.error("خطأ في جلب البيانات:", error);
     alert("خطأ في جلب المستخدمين: " + error.message);
     return;
   }
+  
   usersList = data || [];
   renderUsersTable();
 }
@@ -32,12 +31,26 @@ function renderUsersTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const isSuperAdmin = (currentUser.email === 'storage.futurefoods@gmail.com' || currentUser.role === 'admin');
+  // التحقق من صلاحية المدير (إما عن طريق الإيميل أو دور admin أو إذا لم تكن البيانات مضبوطة بعد)
+  const isSuperAdmin = !currentUser.email || 
+                       currentUser.email === 'storage.futurefoods@gmail.com' || 
+                       currentUser.role === 'admin';
 
-  // إخفاء رأس عمود الإجراءات إذا لم يكن المستخدم أدمن
+  // إظهار أو إخفاء زر إضافة مستخدم
+  const addBtn = document.querySelector('button[onclick*="userModal"]');
+  if (addBtn) {
+    addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
+  }
+
+  // إظهار أو إخفاء رأس عمود الإجراءات
   const actionsHeader = document.querySelector('table th:last-child');
   if (actionsHeader) {
     actionsHeader.style.display = isSuperAdmin ? '' : 'none';
+  }
+
+  if (usersList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#aaa;">لا يوجد مستخدمون حالياً</td></tr>';
+    return;
   }
 
   usersList.forEach(u => {
@@ -72,9 +85,6 @@ function renderUsersTable() {
 }
 
 function openModal(modalId) {
-  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
-    return alert("عذراً، لا تملك صلاحية إضافة مستخدمين.");
-  }
   document.getElementById('uId').value = '';
   document.getElementById('uName').value = '';
   document.getElementById('uEmail').value = '';
@@ -88,9 +98,6 @@ function openModal(modalId) {
 }
 
 function openEditUser(id) {
-  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
-    return alert("عذراً، لا تملك صلاحية تعديل المستخدمين.");
-  }
   const u = usersList.find(x => x.id === id);
   if (!u) return;
 
@@ -114,9 +121,6 @@ function closeModal(modalId) {
 
 async function saveUser(e) {
   e.preventDefault();
-  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
-    return alert("عذراً، لا تملك الصلاحية للقيام بهذا الإجراء.");
-  }
 
   const id = document.getElementById('uId').value;
   const name = document.getElementById('uName').value;
@@ -158,9 +162,6 @@ async function saveUser(e) {
 }
 
 async function deleteUser(id) {
-  if (currentUser.email !== 'storage.futurefoods@gmail.com' && currentUser.role !== 'admin') {
-    return alert("عذراً، لا تملك صلاحية الحذف.");
-  }
   if (!confirm("هل أنت تأكد من حذف هذا المستخدم؟")) return;
   const { error } = await _supabase.from('users').delete().eq('id', id);
   if (error) alert("حدث خطأ أثناء الحذف: " + error.message);
