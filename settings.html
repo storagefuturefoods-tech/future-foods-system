@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الإعدادات - إدارة المستخدمين</title>
+  <title>Settings - User Management</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- مكتبة Supabase -->
+  <!-- Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <header>
-    <h1>إدارة المستخدمين والصلاحيات</h1>
+    <h1>User & Permission Management</h1>
     <nav>
-      <a href="index.html">الرئيسية</a>
-      <a href="inventory.html">المخزون</a>
-      <a href="supply-requests.html">طلبات التغذية</a>
-      <a href="settings.html">الإعدادات</a>
+      <a href="index.html">Home</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="supply-requests.html">Supply Requests</a>
+      <a href="settings.html">Settings</a>
     </nav>
     <div class="user-info">
       <span id="currentUserDisplay"></span>
@@ -27,76 +27,76 @@
   <div class="container">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3>قائمة المستخدمين والصلاحيات</h3>
-        <button class="btn" onclick="openModal('userModal')">+ إضافة مستخدم جديد</button>
+        <h3>Users & Permissions List</h3>
+        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>الاسم</th>
-            <th>البريد الإلكتروني</th>
-            <th>نوع الصلاحية (الدور)</th>
-            <th>صلاحية الفرع / البراند</th>
-            <th>إجراءات</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Branch / Brand Permission</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="usersBody">
-          <!-- سيتم تعبئة البيانات هنا عبر الجافاسكريبت -->
+          <!-- Data populated dynamically via JS -->
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Modal إضافة / تعديل مستخدم -->
+  <!-- Modal: Add / Edit User -->
   <div id="userModal" class="modal" style="display: none;">
     <div class="modal-content">
-      <h3 id="modalTitle">إضافة مستخدم جديد</h3>
+      <h3 id="modalTitle">Add New User</h3>
       <form onsubmit="saveUser(event)" style="margin-top:15px;">
         <input type="hidden" id="uId">
         
         <div class="form-group">
-          <label>الاسم الكامل</label>
+          <label>Full Name</label>
           <input type="text" id="uName" required>
         </div>
         
         <div class="form-group">
-          <label>البريد الإلكتروني</label>
+          <label>Email Address</label>
           <input type="email" id="uEmail" required>
         </div>
         
         <div class="form-group" id="passGroup">
-          <label>كلمة السر المؤقتة</label>
+          <label>Temporary Password</label>
           <input type="password" id="uPass">
         </div>
         
         <div class="form-group">
-          <label>نوع الصلاحية في النظام</label>
+          <label>System Role Permission</label>
           <select id="uRole" required>
-            <option value="admin">مدير النظام (تحكم كامل + تعديل مخزون وطلبات)</option>
-            <option value="store_manager">مدير مخزن (تعديل وتغذية المخزون + الموافقة على الطلبات)</option>
-            <option value="chef">شيف / فرع (إنشاء طلبات تغذية فقط دون تعديل المخزون)</option>
+            <option value="admin">System Admin (Full Access + Inventory & Requests Edit)</option>
+            <option value="store_manager">Store Manager (Edit Inventory + Approve Requests)</option>
+            <option value="chef">Chef / Branch (Create Supply Requests Only - No Inventory Edit)</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label>صلاحية البراند / الفرع</label>
+          <label>Brand / Branch Permission</label>
           <select id="uBrand" required>
-            <option value="All">كل الفروع (Rudy + B-marlin + المشترك)</option>
-            <option value="Rudy">Rudy (يشمل منتجات Rudy والمشترك)</option>
-            <option value="B-marlin">B-marlin (يشمل منتجات B-marlin والمشترك)</option>
+            <option value="All">All Branches (Rudy + B-marlin + Shared)</option>
+            <option value="Rudy">Rudy (Includes Rudy & Shared Products)</option>
+            <option value="B-marlin">B-marlin (Includes B-marlin & Shared Products)</option>
           </select>
         </div>
 
         <div style="display:flex; gap:10px; margin-top:15px;">
-          <button type="submit" class="btn">حفظ البيانات</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">إلغاء</button>
+          <button type="submit" class="btn">Save Data</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ترتيب استدعاء الملفات هام جداً -->
+  <!-- Script Includes -->
   <script src="js/supabase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/settings.js"></script>
