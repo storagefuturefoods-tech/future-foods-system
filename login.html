@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تسجيل الدخول</title>
+  <title>Login</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -11,22 +11,22 @@
 
   <div class="container login-container">
     <div class="card">
-      <h2 style="text-align: center; margin-bottom: 20px;" data-i18n="login_title">تسجيل الدخول للنظام</h2>
+      <h2 style="text-align: center; margin-bottom: 20px;" data-i18n="login_title">System Login</h2>
       <form id="loginForm" onsubmit="handleLogin(event)">
         
         <div class="form-group">
-          <label data-i18n="email">البريد الإلكتروني</label>
-          <!-- تم إزالة الـ value الافتراضية لحل الثغرة -->
+          <label data-i18n="email">Email Address</label>
+          <!-- Default value removed for security -->
           <input type="email" id="loginEmail" required placeholder="example@domain.com" autocomplete="email">
         </div>
         
         <div class="form-group">
-          <label data-i18n="password">كلمة السر</label>
-          <!-- تم إزالة الـ value الافتراضية لحل الثغرة -->
+          <label data-i18n="password">Password</label>
+          <!-- Default value removed for security -->
           <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
         </div>
         
-        <button type="submit" class="btn" style="width: 100%; margin-top: 10px;" data-i18n="login_btn">دخول</button>
+        <button type="submit" class="btn" style="width: 100%; margin-top: 10px;" data-i18n="login_btn">Login</button>
       </form>
     </div>
   </div>
@@ -42,11 +42,11 @@
       const passwordInput = document.getElementById('loginPassword').value.trim();
 
       if (!emailInput || !passwordInput) {
-        alert("يرجى تعبئة كافة الحقول");
+        alert("Please fill in all fields");
         return;
       }
 
-      // البحث في جدول users الصحيح باستخدام maybeSingle للتحقق المباشر
+      // Query the correct 'users' table using maybeSingle for direct verification
       const { data, error } = await _supabase
         .from('users')
         .select('*')
@@ -55,20 +55,20 @@
         .maybeSingle();
 
       if (error) {
-        console.error("خطأ في الاتصال:", error);
-        alert("حدث خطأ أثناء الاتصال بقاعدة البيانات");
+        console.error("Connection error:", error);
+        alert("An error occurred while connecting to the database");
         return;
       }
 
       if (!data) {
         const msg = (typeof translations !== 'undefined' && translations[currentLang]) 
           ? translations[currentLang].invalid_login 
-          : "البريد الإلكتروني أو كلمة السر غير صحيحة";
+          : "Invalid email or password";
         alert(msg);
       } else {
-        // حفظ بيانات المستخدم بنفس المفتاح المعتمد للنظام app_user
+        // Save user data using the primary app key 'app_user'
         localStorage.setItem('app_user', JSON.stringify(data));
-        // مفتاح إضافي احتياطي للتوافق
+        // Fallback key for compatibility
         localStorage.setItem('currentUser', JSON.stringify(data));
         
         window.location.href = 'index.html';
