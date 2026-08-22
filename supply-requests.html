@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>طلبات التغذية</title>
+  <title>Supply Requests</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>طلبات التغذية</h1>
+    <h1>Supply Requests</h1>
     <nav>
-      <a href="index.html">الرئيسية</a>
-      <a href="inventory.html">المخزون</a>
-      <a href="supply-requests.html">طلبات التغذية</a>
-      <a href="settings.html">الإعدادات</a>
+      <a href="index.html">Home</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="supply-requests.html">Supply Requests</a>
+      <a href="settings.html">Settings</a>
     </nav>
     <div class="user-info">
       <div class="cart-icon" onclick="openModal('cartModal')">🛒 <span class="cart-badge" id="cartCount">0</span></div>
@@ -27,17 +27,17 @@
   <div class="container">
     <div class="card">
       <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-        <button class="btn" onclick="openSupplyModal()">+ طلب تغذية جديد</button>
+        <button class="btn" onclick="openSupplyModal()">+ New Supply Request</button>
         <div>
           <select id="statusFilter" onchange="loadOrders()" style="padding: 6px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
-            <option value="الكل">كل الحالات</option>
-            <option value="جديد">جديد</option>
-            <option value="جاري التجهيز">جاري التجهيز</option>
-            <option value="جاهز">جاهز</option>
-            <option value="مكتمل">مكتمل</option>
-            <option value="ملغي">ملغي</option>
+            <option value="الكل">All Statuses</option>
+            <option value="جديد">New</option>
+            <option value="جاري التجهيز">In Preparation</option>
+            <option value="جاهز">Ready</option>
+            <option value="مكتمل">Completed</option>
+            <option value="ملغي">Cancelled</option>
           </select>
-          <button class="btn btn-secondary" onclick="exportOrders()">تصدير الطلبات</button>
+          <button class="btn btn-secondary" onclick="exportOrders()">Export Orders</button>
         </div>
       </div>
 
@@ -45,13 +45,13 @@
         <thead>
           <tr>
             <th><input type="checkbox" id="selectAllOrders" onclick="toggleSelectAllOrders(this)"></th>
-            <th>رقم الطلب</th>
-            <th>المستخدم</th>
-            <th>البراند</th>
-            <th>عدد المنتجات</th>
-            <th>الحالة</th>
-            <th>ملاحظات</th>
-            <th>إجراءات</th>
+            <th>Order ID</th>
+            <th>User</th>
+            <th>Brand</th>
+            <th>Items Count</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="ordersBody"></tbody>
@@ -59,14 +59,14 @@
     </div>
   </div>
 
-  <!-- Modal اختيار المنتجات للطلب -->
+  <!-- Modal: Select Products for Request -->
   <div id="supplyModal" class="modal">
     <div class="modal-content">
       
-      <!-- الهيدر الثابت المطور ليشمل فلاتر البراند والتصنيف والبحث -->
+      <!-- Sticky Modal Header with Search and Category Filters -->
       <div class="modal-header-sticky">
         <div class="modal-title-bar">
-          <h4 style="margin:0; font-weight:bold; color:var(--text-color);">إضافة طلب تغذية جديد</h4>
+          <h4 style="margin:0; font-weight:bold; color:var(--text-color);">Add New Supply Request</h4>
           <button class="btn-close-modal" onclick="closeModal('supplyModal')">✕</button>
         </div>
         
@@ -74,7 +74,7 @@
           <input 
             type="text" 
             id="prodSearch" 
-            placeholder="بحث باسم المنتج أو الرمز..." 
+            placeholder="Search by product name or SKU..." 
             oninput="filterProducts()" 
             style="flex: 2; min-width: 150px; padding:8px 10px; font-size:0.85rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
           >
@@ -83,12 +83,12 @@
             onchange="filterProducts()" 
             style="flex: 1; min-width: 120px; padding:8px 10px; font-size:0.85rem; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:6px; outline:none;"
           >
-            <option value="ALL">كل التصنيفات</option>
+            <option value="ALL">All Categories</option>
           </select>
         </div>
       </div>
 
-      <!-- منطقة المنتجات المخصصة للتمرير -->
+      <!-- Scrollable Products Grid Section -->
       <div class="modal-body-scroll">
         <div id="productsGrid"></div>
       </div>
@@ -96,35 +96,35 @@
     </div>
   </div>
 
-  <!-- Modal معاينة الصورة -->
+  <!-- Modal: Image Preview -->
   <div id="imgPreviewModal" class="img-preview-modal" onclick="closeImagePreview()">
     <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
-    <img id="previewImageSrc" src="" alt="معاينة المنتج">
+    <img id="previewImageSrc" src="" alt="Product Preview">
   </div>
 
-  <!-- Modal السلة -->
+  <!-- Modal: Cart -->
   <div id="cartModal" class="modal">
     <div class="modal-content">
-      <h3>سلة الطلبات</h3>
+      <h3>Request Cart</h3>
       <div id="cartItemsList"></div>
       <div class="form-group" style="margin-top:15px;">
-        <label>ملاحظات الطلب:</label>
+        <label>Order Notes:</label>
         <textarea id="orderNotes" rows="3"></textarea>
       </div>
       <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button class="btn" style="flex: 1;" onclick="submitOrder()">إرسال الطلب النهائي</button>
-        <button class="btn btn-secondary" onclick="closeModal('cartModal')">إلغاء</button>
+        <button class="btn" style="flex: 1;" onclick="submitOrder()">Submit Final Order</button>
+        <button class="btn btn-secondary" onclick="closeModal('cartModal')">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal تفاصيل الطلب -->
+  <!-- Modal: Order Details -->
   <div id="orderDetailsModal" class="modal">
     <div class="modal-content">
-      <h3>تفاصيل الطلب <span id="modalOrderNum"></span></h3>
+      <h3>Order Details <span id="modalOrderNum"></span></h3>
       <div id="orderDetailsContent"></div>
       <div id="orderTimeline"></div>
-      <button class="btn btn-secondary" style="margin-top:15px;" onclick="closeModal('orderDetailsModal')">إغلاق</button>
+      <button class="btn btn-secondary" style="margin-top:15px;" onclick="closeModal('orderDetailsModal')">Close</button>
     </div>
   </div>
 
