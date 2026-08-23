@@ -2,7 +2,7 @@ let availableProducts = [];
 let cart = [];
 let ordersList = [];
 
-// جلب المستخدم الحالي
+// Get current user
 function getCurrentUser() {
   try {
     return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
@@ -11,7 +11,7 @@ function getCurrentUser() {
   }
 }
 
-// فحص هل المستخدم مدير نظام أم مدير مخزن
+// Check if current user is Admin or Store Manager
 function isAdminOrManager() {
   const u = getCurrentUser();
   const role = u.role || '';
@@ -36,7 +36,7 @@ function previewImage(src, altText) {
     modal.onclick = closeImagePreview;
     modal.innerHTML = `
       <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
-      <img id="previewImageSrc" src="" alt="معاينة المنتج">
+      <img id="previewImageSrc" src="" alt="Product Preview">
     `;
     document.body.appendChild(modal);
     img = document.getElementById('previewImageSrc');
@@ -44,7 +44,7 @@ function previewImage(src, altText) {
 
   if (modal && img) {
     img.src = src;
-    img.alt = altText || 'صورة المنتج';
+    img.alt = altText || 'Product Image';
     modal.style.display = 'flex';
   }
 }
@@ -54,7 +54,7 @@ function closeImagePreview() {
   if (modal) modal.style.display = 'none';
 }
 
-// 1. فتح نافذة الطلب وجلب المنتجات مع الفلترة الصحيحة للمشترك
+// 1. Open supply modal and fetch products with appropriate filtering
 async function openSupplyModal() {
   const { data, error } = await _supabase
     .from('products')
@@ -62,7 +62,7 @@ async function openSupplyModal() {
     .eq('is_disabled', false);
 
   if (error) {
-    alert("خطأ في جلب المنتجات: " + error.message);
+    alert("Error fetching products: " + error.message);
     return;
   }
 
@@ -70,25 +70,24 @@ async function openSupplyModal() {
   const userBrand = (currentUser.brand_permission || currentUser.brand || 'All').trim().toLowerCase();
 
   availableProducts = (data || []).filter(p => {
-    // إذا كان الأدمن أو لديه صلاحية "كل الفروع" أو "المشترك"
+    // If Admin or user has "All" permission
     if (
       userBrand === 'all' || 
       userBrand === '' || 
       userBrand.includes('&') || 
       userBrand.includes('pizzeria') || 
-      userBrand.includes('marlin') && userBrand.includes('rudy')
+      (userBrand.includes('marlin') && userBrand.includes('rudy'))
     ) {
       return true;
     }
 
     const prodBrand = (p.brand || '').trim().toLowerCase();
 
-    // إظهار منتجات الفرع الخاص به + المنتجات المشتركة
+    // Show branch-specific products + shared products
     return (
       prodBrand === userBrand || 
       prodBrand === 'all' || 
       prodBrand.includes('&') || 
-      prodBrand.includes('مشترك') ||
       prodBrand.includes('shared')
     );
   });
@@ -104,38 +103,38 @@ function populateCategoriesDropdown(products) {
 
   const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
   
-  catSelect.innerHTML = '<option value="ALL">كل التصنيفات</option>';
+  catSelect.innerHTML = '<option value="ALL">All Categories</option>';
   categories.forEach(cat => {
     catSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
   });
 }
 
-// 2. عرض شبكة المنتجات
+// 2. Render products grid
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
   grid.innerHTML = '';
 
   if (prods.length === 0) {
-    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">لا توجد منتجات مطابقة للبحث أو التصنيف.</p>';
+    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">No products match your search or category filter.</p>';
     return;
   }
 
   prods.forEach(p => {
     const isOutOfStock = p.quantity <= 0;
     const isInCart = cart.some(item => item.id === p.id);
-    const name = typeof currentLang !== 'undefined' && currentLang === 'ar' ? p.name_ar : p.name_en;
+    const name = p.name_en || p.name_ar;
     const imgUrl = p.image_url || 'https://via.placeholder.com/100';
 
     let btnDisabled = isOutOfStock || isInCart;
-    let btnText = 'إضافة';
+    let btnText = 'Add';
     let btnStyle = 'width: 100%; padding: 4px 2px; font-size: 0.72rem; border-radius: 4px; border: none; font-weight: bold; cursor: pointer;';
 
     if (isOutOfStock) {
-      btnText = 'مخلص';
+      btnText = 'Out of Stock';
       btnStyle += ' background: #555; color: #ccc; cursor: not-allowed; opacity: 0.6;';
     } else if (isInCart) {
-      btnText = 'تمت ✔';
+      btnText = 'Added ✔';
       btnStyle += ' background: #4A5568; color: #fff; cursor: not-allowed; opacity: 0.8;';
     } else {
       btnStyle += ' background: var(--primary-color, #2e7d32); color: #fff;';
@@ -146,13 +145,13 @@ function renderProductsGrid(prods) {
         <img 
           src="${imgUrl}" 
           alt="${name}" 
-          title="اضغط للتكبير والمعاينة"
+          title="Click to preview"
           onclick="previewImage('${imgUrl}', '${name}')"
           onerror="this.src='https://via.placeholder.com/100'"
         >
         <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.75rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
         <p style="font-size:0.65rem; color:var(--text-muted); margin: 1px 0;">${p.category || p.brand || ''}</p>
-        <p style="font-size:0.7rem; margin: 2px 0 5px 0;">المتوفر: <strong>${p.quantity}</strong></p>
+        <p style="font-size:0.7rem; margin: 2px 0 5px 0;">Available: <strong>${p.quantity}</strong></p>
         <button style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
           ${btnText}
         </button>
@@ -203,17 +202,17 @@ function renderCart() {
   container.innerHTML = '';
 
   if (cart.length === 0) {
-    container.innerHTML = '<p style="text-align:center; padding:15px; color:var(--text-muted);">السلة فارغة</p>';
+    container.innerHTML = '<p style="text-align:center; padding:15px; color:var(--text-muted);">Cart is empty</p>';
     return;
   }
 
   cart.forEach((item, index) => {
-    const name = typeof currentLang !== 'undefined' && currentLang === 'ar' ? item.name_ar : item.name_en;
+    const name = item.name_en || item.name_ar;
     container.innerHTML += `
       <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="flex:1;">
           <strong style="font-size:0.9rem;">${name}</strong><br>
-          <small style="color:var(--text-muted);">التصنيف: ${item.category || '-'} | المتوفر: ${item.quantity}</small>
+          <small style="color:var(--text-muted);">Category: ${item.category || '-'} | Available: ${item.quantity}</small>
         </div>
         <input 
           type="number" 
@@ -236,7 +235,7 @@ function changeCartQty(index, val) {
   if (isNaN(qty) || qty < 1) {
     qty = 1;
   } else if (qty > max) {
-    alert(`عذراً، الكمية المتاحة في المخزون هي ${max} فقط!`);
+    alert(`Sorry, available stock limit is ${max}!`);
     qty = max;
   }
   
@@ -251,15 +250,15 @@ function removeFromCart(index) {
 }
 
 async function submitOrder() {
-  if (cart.length === 0) return alert("السلة فارغة!");
+  if (cart.length === 0) return alert("Cart is empty!");
 
   for (let item of cart) {
-    const prodName = typeof currentLang !== 'undefined' && currentLang === 'ar' ? item.name_ar : item.name_en;
+    const prodName = item.name_en || item.name_ar;
     if (!item.reqQty || item.reqQty <= 0) {
-      return alert(`خطأ: كمية المنتج (${prodName}) لا يمكن أن تكون صفر أو أقل!`);
+      return alert(`Error: Quantity for product (${prodName}) cannot be zero or less!`);
     }
     if (item.reqQty > item.quantity) {
-      return alert(`خطأ: الكمية المطلوبة للمنتج (${prodName}) أحدث من المتوفر في المخزون (${item.quantity})!`);
+      return alert(`Error: Requested quantity for (${prodName}) exceeds available stock (${item.quantity})!`);
     }
   }
 
@@ -277,17 +276,17 @@ async function submitOrder() {
       brand: currentUser ? (currentUser.brand_permission || currentUser.brand) : '',
       total_items: cart.length,
       notes: notes,
-      status: 'جديد'
+      status: 'New'
     }])
     .select()
     .single();
 
-  if (error) return alert("فشل إنشاء الطلب: " + error.message);
+  if (error) return alert("Failed to create order: " + error.message);
 
   const orderItems = cart.map(c => ({
     order_id: newOrder.id,
     product_sku: c.sku,
-    product_name: typeof currentLang !== 'undefined' && currentLang === 'ar' ? c.name_ar : c.name_en,
+    product_name: c.name_en || c.name_ar,
     image_url: c.image_url,
     quantity_pieces: c.reqQty,
     box_capacity: c.items_per_box
@@ -296,11 +295,11 @@ async function submitOrder() {
   await _supabase.from('order_items').insert(orderItems);
   await _supabase.from('order_logs').insert([{
     order_id: newOrder.id,
-    status_change: 'إنشاء الطلب (جديد)',
+    status_change: 'Order Created (New)',
     action_by: empName
   }]);
 
-  alert("تم إرسال الطلب بنجاح! رقم الطلب: " + orderNum);
+  alert("Order submitted successfully! Order ID: " + orderNum);
   cart = [];
   updateCartBadge();
   closeModal('cartModal');
@@ -308,15 +307,15 @@ async function submitOrder() {
   loadOrders();
 }
 
-// 3. جلب الطلبات مع تقييد التحكم بالحالة حسب الصلاحية
+// 3. Fetch orders and manage status permissions
 async function loadOrders() {
-  const filter = document.getElementById('statusFilter')?.value || 'الكل';
+  const filter = document.getElementById('statusFilter')?.value || 'ALL';
   let query = _supabase.from('orders').select('*').order('id', { ascending: false });
   
-  if (filter !== 'الكل') query = query.eq('status', filter);
+  if (filter !== 'ALL' && filter !== 'الكل') query = query.eq('status', filter);
 
   const { data, error } = await query;
-  if (error) return alert("خطأ في جلب الطلبات: " + error.message);
+  if (error) return alert("Error fetching orders: " + error.message);
 
   ordersList = data || [];
   const tbody = document.getElementById('ordersBody');
@@ -325,21 +324,20 @@ async function loadOrders() {
   tbody.innerHTML = '';
 
   if (ordersList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; color:var(--text-muted);">لا توجد طلبات تغذية حتى الآن.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; color:var(--text-muted);">No supply requests found.</td></tr>';
     return;
   }
 
   const canEditStatus = isAdminOrManager();
 
   ordersList.forEach(o => {
-    // إذا كان المستخدم مدير تظهر له القائمة المنسدلة، أما الشيف فيظهر له النص فقط بدون إمكانية التغيير
     const statusCell = canEditStatus ? `
       <select onchange="updateOrderStatus(${o.id}, this.value)" style="padding:4px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); border-radius:4px;">
-        <option value="جديد" ${o.status==='جديد'?'selected':''}>جديد</option>
-        <option value="جاري التجهيز" ${o.status==='جاري التجهيز'?'selected':''}>جاري التجهيز</option>
-        <option value="جاهز" ${o.status==='جاهز'?'selected':''}>جاهز</option>
-        <option value="مكتمل" ${o.status==='مكتمل'?'selected':''}>مكتمل</option>
-        <option value="ملغي" ${o.status==='ملغي'?'selected':''}>ملغي</option>
+        <option value="New" ${o.status==='New' || o.status==='جديد' ?'selected':''}>New</option>
+        <option value="In Preparation" ${o.status==='In Preparation' || o.status==='جاري التجهيز' ?'selected':''}>In Preparation</option>
+        <option value="Ready" ${o.status==='Ready' || o.status==='جاهز' ?'selected':''}>Ready</option>
+        <option value="Completed" ${o.status==='Completed' || o.status==='مكتمل' ?'selected':''}>Completed</option>
+        <option value="Cancelled" ${o.status==='Cancelled' || o.status==='ملغي' ?'selected':''}>Cancelled</option>
       </select>
     ` : `<span style="font-weight:bold; padding: 4px 8px; border-radius:4px; background:rgba(255,255,255,0.1);">${o.status}</span>`;
 
@@ -352,7 +350,7 @@ async function loadOrders() {
         <td>${o.total_items}</td>
         <td>${statusCell}</td>
         <td>${o.notes || '-'}</td>
-        <td><button class="btn" style="padding:4px 8px;" onclick="viewOrderDetails(${o.id})">تفاصيل</button></td>
+        <td><button class="btn" style="padding:4px 8px;" onclick="viewOrderDetails(${o.id})">Details</button></td>
       </tr>
     `;
   });
@@ -360,7 +358,7 @@ async function loadOrders() {
 
 async function updateOrderStatus(orderId, newStatus) {
   if (!isAdminOrManager()) {
-    alert("عذراً، ليس لديك صلاحية لتغيير حالة الطلبات!");
+    alert("Sorry, you do not have permission to change order status!");
     loadOrders();
     return;
   }
@@ -369,7 +367,7 @@ async function updateOrderStatus(orderId, newStatus) {
   await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
   await _supabase.from('order_logs').insert([{
     order_id: orderId,
-    status_change: `تغيير الحالة إلى (${newStatus})`,
+    status_change: `Status changed to (${newStatus})`,
     action_by: empName
   }]);
   loadOrders();
@@ -397,8 +395,8 @@ async function viewOrderDetails(orderId) {
           <div style="flex: 1;">
             <div style="font-weight: bold; font-size: 0.95rem; color: var(--text-color, #fff);">${i.product_name}</div>
             <div style="font-size: 0.82rem; color: var(--text-muted, #aaa); margin-top: 2px;">
-              الكمية: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${i.quantity_pieces}</span> حبة 
-              <span style="opacity: 0.8;">(${boxes} كرتون)</span>
+              Quantity: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${i.quantity_pieces}</span> Pcs 
+              <span style="opacity: 0.8;">(${boxes} Boxes)</span>
             </div>
           </div>
         </div>
@@ -407,8 +405,8 @@ async function viewOrderDetails(orderId) {
 
     content.innerHTML = `
       <div style="margin-bottom: 15px;">
-        <h6 style="margin-bottom: 10px; color: var(--primary-color, #4CAF50); font-size: 0.9rem;">📦 منتجات الطلب:</h6>
-        ${itemsHtml || '<p style="color:var(--text-muted);">لا توجد عناصر</p>'}
+        <h6 style="margin-bottom: 10px; color: var(--primary-color, #4CAF50); font-size: 0.9rem;">📦 Order Items:</h6>
+        ${itemsHtml || '<p style="color:var(--text-muted);">No items found</p>'}
       </div>
     `;
   }
@@ -430,7 +428,7 @@ async function viewOrderDetails(orderId) {
       return `
         <li style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-color, #ddd); list-style-type: disc;">
           <span style="font-weight: bold;">${l.status_change}</span>
-          <span style="color: var(--text-muted, #aaa);"> بواسطة: </span>
+          <span style="color: var(--text-muted, #aaa);"> by: </span>
           <span style="color: #64B5F6;">${l.action_by}</span>
           <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 2px;">🕒 ${formattedDate}</div>
         </li>
@@ -439,9 +437,9 @@ async function viewOrderDetails(orderId) {
 
     timeline.innerHTML = `
       <hr style="border: 0; border-top: 1px solid var(--border-color, #444); margin: 20px 0 15px 0;">
-      <h6 style="margin-bottom: 10px; color: #FFB74D; font-size: 0.9rem;">📜 سجل الإجراءات (Audit Log):</h6>
-      <ul style="padding-right: 20px; margin: 0;">
-        ${logsHtml || '<li style="color:var(--text-muted);">لا يوجد سجل إجراءات</li>'}
+      <h6 style="margin-bottom: 10px; color: #FFB74D; font-size: 0.9rem;">📜 Audit Log:</h6>
+      <ul style="padding-left: 20px; margin: 0;">
+        ${logsHtml || '<li style="color:var(--text-muted);">No action logs recorded</li>'}
       </ul>
     `;
   }
@@ -453,7 +451,7 @@ function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
   const listToExport = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
   
-  if(listToExport.length === 0) return alert("لا توجد طلبات لتصديرها");
+  if(listToExport.length === 0) return alert("No orders to export");
 
   const ws = XLSX.utils.json_to_sheet(listToExport);
   const wb = XLSX.utils.book_new();
