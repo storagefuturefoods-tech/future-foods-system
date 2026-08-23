@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الرئيسية - Dashboard</title>
+  <title>Dashboard - Supply Management</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- مكتبة تحويل HTML إلى PDF بشكل احترافي مع الصور -->
+  <!-- HTML to PDF Library with full CORS image support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
@@ -85,7 +85,7 @@
       color: var(--text-muted, #aaa);
     }
 
-    /* تنسيق كروت المعاينة داخل المودال */
+    /* Modal Item Styling */
     .modal-low-stock-item {
       display: flex;
       align-items: center;
@@ -98,14 +98,45 @@
       margin-bottom: 10px;
     }
     .modal-low-stock-item img {
-      width: 50px;
-      height: 50px;
+      width: 48px;
+      height: 48px;
       object-fit: cover;
       border-radius: 6px;
       border: 1px solid var(--border-color, #555);
     }
 
-    /* جدول التصدير المخفي للـ PDF */
+    /* Plus/Minus Qty Control */
+    .qty-picker {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .qty-picker-btn {
+      width: 26px;
+      height: 26px;
+      border: none;
+      background: var(--primary-color, #2563eb);
+      color: #fff;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qty-picker-input {
+      width: 45px;
+      height: 26px;
+      text-align: center;
+      border: 1px solid var(--border-color, #444);
+      background: var(--card-bg, #1e1e1e);
+      color: var(--text-color, #fff);
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+
+    /* PDF Printable Area (Hidden by default) */
     #pdfRenderArea {
       display: none;
       background: #ffffff;
@@ -139,10 +170,10 @@
 <body>
   <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
     <nav style="display: flex; align-items: center; gap: 12px;">
-      <a href="index.html" title="الرئيسية" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
-      <a href="inventory.html" title="المخزون" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
-      <a href="supply-requests.html" title="طلبات التوريد" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
-      <a href="settings.html" title="الإعدادات" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
     </nav>
     <div class="user-info">
       <span id="currentUserDisplay" style="font-weight: 600;"></span>
@@ -150,84 +181,92 @@
   </header>
 
   <div class="container">
-    <h2>لوحة التحكم والتحليلات</h2>
+    <h2>Dashboard & Analytics</h2>
 
     <div class="dashboard-grid">
       
-      <!-- الكارت الأول: منتجات بلغت الحد الأدنى -->
+      <!-- Card 1: Low Stock Alerts -->
       <div class="widget-card">
         <div>
           <div class="widget-header">
             <div class="widget-title" style="color: #f59e0b;">
-              <i class="fa-solid fa-triangle-exclamation"></i> تنبيهات الحد الأدنى
+              <i class="fa-solid fa-triangle-exclamation"></i> Low Stock Alerts
             </div>
             <span class="badge-count warning" id="lowStockCount">0</span>
           </div>
 
           <div class="preview-list" id="lowStockPreview">
-            <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">جاري التحميل...</p>
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">Loading...</p>
           </div>
         </div>
 
         <button class="btn btn-secondary" onclick="openLowStockModal()" style="margin-top: 15px; text-align: center; font-size: 0.85rem; width: 100%;">
-          عرض كل منتجات الحد الأدنى <i class="fa-solid fa-expand"></i>
+          View All Low Stock Products <i class="fa-solid fa-expand"></i>
         </button>
       </div>
 
-      <!-- الكارت الثاني: الطلبات الجديدة المعلقة -->
+      <!-- Card 2: Pending Orders -->
       <div class="widget-card">
         <div>
           <div class="widget-header">
             <div class="widget-title" style="color: #3b82f6;">
-              <i class="fa-solid fa-clock-rotate-left"></i> الطلبات الجديدة المعلقة
+              <i class="fa-solid fa-clock-rotate-left"></i> Pending Orders
             </div>
             <span class="badge-count" style="background: #3b82f6;" id="pendingOrdersCount">0</span>
           </div>
 
           <div class="preview-list" id="pendingOrdersPreview">
-            <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">جاري التحميل...</p>
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">Loading...</p>
           </div>
         </div>
 
         <a href="supply-requests.html?status=New" class="btn btn-secondary" style="margin-top: 15px; text-align: center; font-size: 0.85rem;">
-          إدارة كل الطلبات <i class="fa-solid fa-arrow-left"></i>
+          Manage All Orders <i class="fa-solid fa-arrow-right"></i>
         </a>
       </div>
 
     </div>
   </div>
 
-  <!-- النافذة المنبثقة: قائمة منتجات الحد الأدنى المكتملة -->
+  <!-- Modal: Low Stock & Purchase PDF Builder -->
   <div id="lowStockModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width: 650px; max-height: 85vh; display: flex; flex-direction: column;">
+    <div class="modal-content" style="max-width: 650px; max-height: 88vh; display: flex; flex-direction: column;">
       
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
-        <h3 style="margin: 0; color: #f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i> قائمة المنتجات الواصلة للحد الأدنى</h3>
+        <h3 style="margin: 0; color: #f59e0b;"><i class="fa-solid fa-cart-flatbed"></i> Purchase Order List</h3>
         <button onclick="closeModal('lowStockModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
-      <!-- القائمة الجانبية للتمرير -->
+      <!-- Add Custom Product Option inside Modal -->
+      <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center;">
+        <select id="extraProductSelect" style="flex: 1; padding: 6px 10px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
+          <option value="">-- Add Extra Product to PDF --</option>
+        </select>
+        <button class="btn" onclick="addExtraProductToList()" style="padding: 6px 12px; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> Add</button>
+      </div>
+
+      <!-- Scrollable Purchase Items List -->
       <div style="flex: 1; overflow-y: auto; margin: 15px 0;" id="fullLowStockList"></div>
 
-      <!-- الأزرار والعمليات -->
+      <!-- Modal Action Footer -->
       <div style="display: flex; gap: 10px; border-top: 1px solid var(--border-color, #444); padding-top: 10px;">
-        <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('lowStockModal')">إغلاق</button>
-        <button class="btn" style="flex: 2; background: #2563eb;" onclick="exportPurchasePDF()"><i class="fa-solid fa-file-pdf"></i> تصدير PDF للمشتريات</button>
+        <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('lowStockModal')">Close</button>
+        <button class="btn" style="flex: 2; background: #2563eb;" onclick="exportPurchasePDF()"><i class="fa-solid fa-file-pdf"></i> Export Purchase PDF</button>
       </div>
 
     </div>
   </div>
 
-  <!-- حاوية طباعة PDF (مخفية وتصمَّم بلغة إنجليزية رسمية) -->
+  <!-- Hidden Container for PDF Rendering -->
   <div id="pdfRenderArea">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
       <div>
         <h2 style="margin: 0; color: #1e3a8a;">PURCHASE REQUISITION ORDER</h2>
-        <p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Low Stock Replenishment Request</p>
+        <p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Generated for Procurement Department</p>
       </div>
       <div style="text-align: right; font-size: 11px;">
         <p style="margin: 2px 0;"><strong>Date:</strong> <span id="pdfDate"></span></p>
-        <p style="margin: 2px 0;"><strong>Generated By:</strong> <span id="pdfUser"></span></p>
+        <p style="margin: 2px 0;"><strong>Requested By:</strong> <span id="pdfUser"></span></p>
       </div>
     </div>
 
@@ -247,39 +286,45 @@
   <script src="js/supabase-config.js"></script>
   <script src="js/app.js"></script>
   <script>
-    let globalLowStockProducts = [];
+    let allAvailableProducts = [];
+    let activePurchaseItems = []; // List of products currently inside the modal
 
     async function loadDashboardCards() {
       const { data: products } = await _supabase.from('products').select('*').eq('is_disabled', false);
       
       if (products) {
-        globalLowStockProducts = products.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
+        allAvailableProducts = products;
         
-        document.getElementById('lowStockCount').innerText = globalLowStockProducts.length;
+        // Filter Low Stock Products
+        const lowStock = products.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
+        document.getElementById('lowStockCount').innerText = lowStock.length;
+
         const lowContainer = document.getElementById('lowStockPreview');
         lowContainer.innerHTML = '';
 
-        if (globalLowStockProducts.length === 0) {
-          lowContainer.innerHTML = '<p style="text-align:center; color:#10b981; font-size:0.85rem;">جميع المنتجات في مستويات آمنة 👍</p>';
+        if (lowStock.length === 0) {
+          lowContainer.innerHTML = '<p style="text-align:center; color:#10b981; font-size:0.85rem;">All stock levels are optimal 👍</p>';
         } else {
-          // عرض 3 منتجات فقط في الكارت الرئيسي
-          globalLowStockProducts.slice(0, 3).forEach(p => {
+          // Display maximum 3 items in preview card
+          lowStock.slice(0, 3).forEach(p => {
             const img = p.image_url || 'https://via.placeholder.com/40';
-            const name = p.name_ar || p.name_en;
+            const name = p.name_en || p.name_ar;
             lowContainer.innerHTML += `
               <div class="preview-item">
                 <img src="${img}" alt="${name}" onerror="this.src='https://via.placeholder.com/40'">
                 <div class="preview-info">
                   <div class="preview-name">${name}</div>
-                  <div class="preview-sub">المخزون الحالي: <strong style="color:#f59e0b;">${p.quantity}</strong> | الحد الأدنى: ${p.min_limit || 5}</div>
+                  <div class="preview-sub">Current Stock: <strong style="color:#f59e0b;">${p.quantity}</strong> | Min: ${p.min_limit || 5}</div>
                 </div>
               </div>
             `;
           });
         }
+
+        populateExtraProductsDropdown();
       }
 
-      // جلب الطلبات المعلقة
+      // Fetch Pending Orders
       const { data: orders } = await _supabase.from('orders').select('*').eq('status', 'New').order('id', { ascending: false });
       if (orders) {
         document.getElementById('pendingOrdersCount').innerText = orders.length;
@@ -287,7 +332,7 @@
         ordersContainer.innerHTML = '';
 
         if (orders.length === 0) {
-          ordersContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:0.85rem;">لا توجد طلبات جديدة معلقة 🎉</p>';
+          ordersContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:0.85rem;">No pending requests 🎉</p>';
         } else {
           orders.slice(0, 3).forEach(o => {
             ordersContainer.innerHTML += `
@@ -296,8 +341,8 @@
                   <i class="fa-solid fa-box"></i>
                 </div>
                 <div class="preview-info">
-                  <div class="preview-name">${o.order_number} - ${o.user_name || 'موظف'}</div>
-                  <div class="preview-sub">عدد المواد: ${o.total_items} | الماركة: ${o.brand || '-'}</div>
+                  <div class="preview-name">${o.order_number} - ${o.user_name || 'Staff'}</div>
+                  <div class="preview-sub">Items: ${o.total_items} | Brand: ${o.brand || '-'}</div>
                 </div>
               </div>
             `;
@@ -306,87 +351,150 @@
       }
     }
 
-    // فتح النافذة المنبثقة وعرض جميع منتجات الحد الأدنى
+    function populateExtraProductsDropdown() {
+      const select = document.getElementById('extraProductSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="">-- Add Extra Product to PDF --</option>';
+      allAvailableProducts.forEach(p => {
+        const name = p.name_en || p.name_ar;
+        select.innerHTML += `<option value="${p.id}">${name} (SKU: ${p.sku || 'N/A'})</option>`;
+      });
+    }
+
+    // Open Modal and initialize with Low Stock Items
     function openLowStockModal() {
-      const container = document.getElementById('fullLowStockList');
-      container.innerHTML = '';
+      // Default list loaded with low stock products
+      activePurchaseItems = allAvailableProducts
+        .filter(p => p.quantity <= (p.min_limit || p.min_stock || 5))
+        .map(p => ({
+          ...p,
+          requestedQty: (p.min_limit || 5) * 2 // Default suggestion quantity
+        }));
 
-      if (globalLowStockProducts.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">لا توجد منتجات واصلة للحد الأدنى حالياً.</p>';
-      } else {
-        globalLowStockProducts.forEach(p => {
-          const img = p.image_url || 'https://via.placeholder.com/50';
-          const nameEn = p.name_en || p.name_ar || 'N/A';
-          const sku = p.sku || 'N/A';
-          const defaultReqQty = (p.min_limit || 5) * 2; // اقتراح كمية مطلوبة تلقائياً
-
-          container.innerHTML += `
-            <div class="modal-low-stock-item">
-              <img src="${img}" alt="${nameEn}" onerror="this.src='https://via.placeholder.com/50'">
-              <div style="flex: 1;">
-                <div style="font-weight: bold; font-size: 0.88rem; color: var(--text-color);">${nameEn}</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${sku} | المخزون الحالي: <strong style="color:#e53e3e">${p.quantity}</strong></div>
-              </div>
-              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                <label style="font-size: 0.7rem; color: var(--text-muted);">الكمية المطلوبة:</label>
-                <input type="number" id="req-qty-${p.id}" value="${defaultReqQty}" min="1" style="width: 70px; padding: 4px; text-align: center; border-radius: 4px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); font-weight: bold;">
-              </div>
-            </div>
-          `;
-        });
-      }
-
+      renderModalItemList();
       openModal('lowStockModal');
     }
 
-    // تصدير ملف PDF بتنسيق المشتريات
+    // Render Modal Items List with + and - Controls
+    function renderModalItemList() {
+      const container = document.getElementById('fullLowStockList');
+      container.innerHTML = '';
+
+      if (activePurchaseItems.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No products currently selected for purchase.</p>';
+        return;
+      }
+
+      activePurchaseItems.forEach((p, index) => {
+        const img = p.image_url || 'https://via.placeholder.com/48';
+        const nameEn = p.name_en || p.name_ar || 'N/A';
+        const sku = p.sku || 'N/A';
+
+        container.innerHTML += `
+          <div class="modal-low-stock-item">
+            <img src="${img}" alt="${nameEn}" onerror="this.src='https://via.placeholder.com/48'">
+            <div style="flex: 1;">
+              <div style="font-weight: bold; font-size: 0.88rem; color: var(--text-color);">${nameEn}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${sku} | Stock: <strong style="color:#e53e3e">${p.quantity}</strong></div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="qty-picker">
+                <button class="qty-picker-btn" onclick="adjustQty(${index}, -1)">-</button>
+                <input type="number" class="qty-picker-input" value="${p.requestedQty}" onchange="setManualQty(${index}, this.value)">
+                <button class="qty-picker-btn" onclick="adjustQty(${index}, 1)">+</button>
+              </div>
+              <button onclick="removeItemFromList(${index})" style="background:none; border:none; color:#e53e3e; cursor:pointer; font-size:1rem;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function adjustQty(index, change) {
+      if (!activePurchaseItems[index]) return;
+      activePurchaseItems[index].requestedQty += change;
+      if (activePurchaseItems[index].requestedQty < 1) activePurchaseItems[index].requestedQty = 1;
+      renderModalItemList();
+    }
+
+    function setManualQty(index, val) {
+      if (!activePurchaseItems[index]) return;
+      let qty = parseInt(val) || 1;
+      if (qty < 1) qty = 1;
+      activePurchaseItems[index].requestedQty = qty;
+      renderModalItemList();
+    }
+
+    function removeItemFromList(index) {
+      activePurchaseItems.splice(index, 1);
+      renderModalItemList();
+    }
+
+    function addExtraProductToList() {
+      const select = document.getElementById('extraProductSelect');
+      const selectedId = select.value;
+      if (!selectedId) return;
+
+      const prod = allAvailableProducts.find(p => p.id == selectedId);
+      if (!prod) return;
+
+      // Check if product already exists in active list
+      const existing = activePurchaseItems.find(p => p.id == selectedId);
+      if (existing) {
+        existing.requestedQty += 1;
+      } else {
+        activePurchaseItems.push({
+          ...prod,
+          requestedQty: (prod.min_limit || 5) * 2
+        });
+      }
+
+      select.value = '';
+      renderModalItemList();
+    }
+
+    // Export PDF formatted for Procurement Department
     function exportPurchasePDF() {
-      if (globalLowStockProducts.length === 0) {
-        return alert("لا توجد منتجات لتصديرها.");
+      if (activePurchaseItems.length === 0) {
+        return alert("Please select at least one item to export.");
       }
 
       const pdfTableBody = document.getElementById('pdfTableBody');
       pdfTableBody.innerHTML = '';
 
-      // تعبئة جدول الـ PDF بالمعلومات المطلوبة بالإنجليزية
-      globalLowStockProducts.forEach(p => {
+      activePurchaseItems.forEach(p => {
         const img = p.image_url || 'https://via.placeholder.com/40';
         const sku = p.sku || 'N/A';
         const nameEn = p.name_en || p.name_ar || 'N/A';
-        const qtyInput = document.getElementById(`req-qty-${p.id}`);
-        const requestedQty = qtyInput ? qtyInput.value : 1;
 
         pdfTableBody.innerHTML += `
           <tr>
             <td style="text-align: center;"><img src="${img}" crossorigin="anonymous"></td>
             <td><strong>${sku}</strong></td>
             <td>${nameEn}</td>
-            <td style="font-weight: bold; text-align: center; font-size: 14px;">${requestedQty}</td>
+            <td style="font-weight: bold; text-align: center; font-size: 14px;">${p.requestedQty}</td>
           </tr>
         `;
       });
 
-      // إعداد بيانات الترويسة
       document.getElementById('pdfDate').innerText = new Date().toLocaleDateString('en-US');
       const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
       document.getElementById('pdfUser').innerText = currentUser.name || currentUser.email || 'Store Manager';
 
-      // إظهار منطقة الطباعة مؤقتاً لالتقاط الصور
       const element = document.getElementById('pdfRenderArea');
       element.style.display = 'block';
 
-      // إعداد خيارات إنشاء PDF
       const opt = {
         margin:       [10, 10, 10, 10],
-        filename:     `Purchase_Request_${new Date().toISOString().slice(0,10)}.pdf`,
+        filename:     `Purchase_Requisition_${new Date().toISOString().slice(0,10)}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      // توليد وحفظ PDF
       html2pdf().set(opt).from(element).save().then(() => {
-        element.style.display = 'none'; // إعادة إخفاء الحاوية بعد الطباعة
+        element.style.display = 'none';
       });
     }
 
