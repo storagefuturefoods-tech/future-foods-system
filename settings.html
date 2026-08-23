@@ -5,30 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - User Management</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <header>
-    <h1>User & Permission Management</h1>
+    <h1><i class="fa-solid fa-users-gear"></i> User & Permission Management</h1>
     <nav>
-      <a href="index.html">Home</a>
-      <a href="inventory.html">Inventory</a>
-      <a href="supply-requests.html">Supply Requests</a>
-      <a href="settings.html">Settings</a>
+      <a href="index.html"><i class="fa-solid fa-house"></i> Home</a>
+      <a href="inventory.html"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="supply-requests.html"><i class="fa-solid fa-truck-ramp-box"></i> Supply Requests</a>
+      <a href="settings.html" class="active"><i class="fa-solid fa-gear"></i> Settings</a>
     </nav>
     <div class="user-info">
-      <span id="currentUserDisplay"></span>
-      <button class="btn btn-secondary" onclick="toggleLanguage()">Ar/En</button>
+      <span id="currentUserDisplay"><i class="fa-solid fa-user"></i> </span>
     </div>
   </header>
 
   <div class="container">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3>Users & Permissions List</h3>
-        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
+        <h3><i class="fa-solid fa-list-check"></i> Users & Permissions List</h3>
+        <button class="btn" onclick="openModal('userModal')"><i class="fa-solid fa-user-plus"></i> Add New User</button>
       </div>
 
       <table>
@@ -51,7 +52,7 @@
   <!-- Modal: Add / Edit User -->
   <div id="userModal" class="modal" style="display: none;">
     <div class="modal-content">
-      <h3 id="modalTitle">Add New User</h3>
+      <h3 id="modalTitle"><i class="fa-solid fa-user-pen"></i> Add New User</h3>
       <form onsubmit="saveUser(event)" style="margin-top:15px;">
         <input type="hidden" id="uId">
         
@@ -89,8 +90,8 @@
         </div>
 
         <div style="display:flex; gap:10px; margin-top:15px;">
-          <button type="submit" class="btn">Save Data</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+          <button type="submit" class="btn"><i class="fa-solid fa-floppy-disk"></i> Save Data</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')"><i class="fa-solid fa-xmark"></i> Cancel</button>
         </div>
       </form>
     </div>
