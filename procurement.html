@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procurement & Supply Orders</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- HTML to PDF Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .order-card {
+      background: var(--card-bg, #1e1e1e);
+      border: 1px solid var(--border-color, #333);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 15px;
+    }
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color, #333);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .status-pending { background: #f59e0b; color: #000; }
+    .status-received { background: #10b981; color: #fff; }
+    .status-cancelled { background: #ef4444; color: #fff; }
+
+    .item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed var(--border-color, #333);
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-row img {
+      width: 36px;
+      height: 36px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    /* Qty Control Buttons */
+    .qty-picker {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .qty-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .qty-input {
+      width: 50px;
+      height: 28px;
+      text-align: center;
+      background: var(--card-bg, #1e1e1e);
+      color: var(--text-color, #fff);
+      border: 1px solid var(--border-color, #444);
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    /* Hidden Printable Report Area */
+    #pdfRenderArea {
+      display: none;
+      background: #ffffff;
+      color: #000000;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+    #pdfRenderArea table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    #pdfRenderArea th, #pdfRenderArea td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      font-size: 12px;
+    }
+    #pdfRenderArea th { background-color: #f2f2f2; }
+    #pdfRenderArea img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+    <nav style="display: flex; align-items: center; gap: 12px;">
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
+    </nav>
+    <div class="user-info">
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="page-header">
+      <h2>Procurement & Supply Orders</h2>
+      <button class="btn" style="background: #2563eb;" onclick="openCreateOrderModal()">
+        <i class="fa-solid fa-cart-plus"></i> New Supply Order
+      </button>
+    </div>
+
+    <!-- Orders History List -->
+    <div id="ordersList">
+      <p style="text-align: center; color: var(--text-muted);">Loading procurement orders...</p>
+    </div>
+  </div>
+
+  <!-- Modal: Create New Supply Order -->
+  <div id="createOrderModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 650px; max-height: 88vh; display: flex; flex-direction: column;">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
+        <h3 style="margin: 0; color: #2563eb;"><i class="fa-solid fa-boxes-packing"></i> Create Supply Order</h3>
+        <button onclick="closeModal('createOrderModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Add Product to Order Selection -->
+      <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center;">
+        <select id="productSelect" style="flex: 1; padding: 8px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
+          <option value="">-- Select Product --</option>
+        </select>
+        <button class="btn" onclick="addItemToOrder()" style="padding: 8px 14px;"><i class="fa-solid fa-plus"></i> Add</button>
+      </div>
+
+      <!-- Selected Items Container -->
+      <div style="flex: 1; overflow-y: auto; margin: 15px 0;" id="orderItemsContainer"></div>
+
+      <!-- Footer Buttons -->
+      <div style="display: flex; gap: 10px; border-top: 1px solid var(--border-color, #444); padding-top: 10px;">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('createOrderModal')">Cancel</button>
+        <button class="btn" style="flex: 2; background: #10b981;" onclick="submitSupplyOrder()"><i class="fa-solid fa-paper-plane"></i> Submit Order</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PDF Render Layout -->
+  <div id="pdfRenderArea">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
+      <div>
+        <h2 style="margin: 0; color: #1e3a8a;">PURCHASE REQUISITION REPORT</h2>
+        <p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Official Procurement Document</p>
+      </div>
+      <div style="text-align: right; font-size: 11px;">
+        <p style="margin: 2px 0;"><strong>Order #:</strong> <span id="pdfOrderId"></span></p>
+        <p style="margin: 2px 0;"><strong>Date:</strong> <span id="pdfDate"></span></p>
+        <p style="margin: 2px 0;"><strong>Status:</strong> <span id="pdfStatus"></span></p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 15%;">Image</th>
+          <th style="width: 25%;">SKU</th>
+          <th style="width: 40%;">Product Name</th>
+          <th style="width: 20%;">Qty Requested</th>
+        </tr>
+      </thead>
+      <tbody id="pdfTableBody"></tbody>
+    </table>
+  </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    let allProducts = [];
+    let currentOrderItems = [];
+    let allOrdersList = [];
+
+    async function initProcurement() {
+      await fetchProducts();
+      await fetchOrders();
+    }
+
+    async function fetchProducts() {
+      const { data } = await _supabase.from('products').select('*').eq('is_disabled', false);
+      if (data) {
+        allProducts = data;
+        const select = document.getElementById('productSelect');
+        select.innerHTML = '<option value="">-- Select Product --</option>';
+        data.forEach(p => {
+          const name = p.name_en || p.name_ar;
+          select.innerHTML += `<option value="${p.id}">${name} (Stock: ${p.quantity})</option>`;
+        });
+      }
+    }
+
+    async function fetchOrders() {
+      const { data } = await _supabase.from('procurement_orders').select('*').order('id', { ascending: false });
+      const container = document.getElementById('ordersList');
+      container.innerHTML = '';
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding: 20px; color: var(--text-muted);">No procurement orders found.</p>';
+        return;
+      }
+
+      allOrdersList = data;
+      data.forEach(order => {
+        const statusClass = `status-${order.status.toLowerCase()}`;
+        const items = order.items || [];
+        
+        let itemsHtml = items.map(i => `
+          <div class="item-row">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <img src="${i.image_url || 'https://via.placeholder.com/36'}" onerror="this.src='https://via.placeholder.com/36'">
+              <div>
+                <strong style="font-size:0.85rem;">${i.name_en || i.name_ar}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">SKU: ${i.sku || 'N/A'}</div>
+              </div>
+            </div>
+            <div style="font-weight:bold; font-size:0.9rem;">Qty: ${i.qty}</div>
+          </div>
+        `).join('');
+
+        container.innerHTML += `
+          <div class="order-card">
+            <div class="order-header">
+              <div>
+                <strong style="font-size: 1.05rem;">Order #${order.id}</strong>
+                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">${new Date(order.created_at).toLocaleDateString()}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="status-badge ${statusClass}">${order.status}</span>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="exportOrderPDF(${order.id})" title="Export PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="exportOrderExcel(${order.id})" title="Export Excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
+              </div>
+            </div>
+
+            <div>${itemsHtml}</div>
+
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color, #333); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; color:var(--text-muted);">By: ${order.created_by || 'Staff'}</span>
+              <div style="display:flex; gap:6px;">
+                ${order.status === 'Pending' ? `
+                  <button class="btn" style="background:#10b981; padding:4px 10px; font-size:0.75rem;" onclick="updateOrderStatus(${order.id}, 'Received')">Mark Received</button>
+                  <button class="btn" style="background:#ef4444; padding:4px 10px; font-size:0.75rem;" onclick="updateOrderStatus(${order.id}, 'Cancelled')">Cancel Order</button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function openCreateOrderModal() {
+      currentOrderItems = allProducts
+        .filter(p => p.quantity <= (p.min_limit || p.min_stock || 5))
+        .map(p => ({ ...p, qty: (p.min_limit || 5) * 2 }));
+
+      renderOrderItems();
+      openModal('createOrderModal');
+    }
+
+    function renderOrderItems() {
+      const container = document.getElementById('orderItemsContainer');
+      container.innerHTML = '';
+
+      if (currentOrderItems.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No items added to order.</p>';
+        return;
+      }
+
+      currentOrderItems.forEach((item, idx) => {
+        container.innerHTML += `
+          <div class="item-row" style="background:var(--input-bg); padding:8px; border-radius:6px; margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <img src="${item.image_url || 'https://via.placeholder.com/36'}">
+              <div>
+                <strong style="font-size:0.85rem;">${item.name_en || item.name_ar}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">SKU: ${item.sku || 'N/A'}</div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="qty-picker">
+                <button class="qty-btn" onclick="changeQty(${idx}, -1)">-</button>
+                <input type="number" class="qty-input" value="${item.qty}" onchange="setQty(${idx}, this.value)">
+                <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+              </div>
+              <button onclick="removeItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function addItemToOrder() {
+      const select = document.getElementById('productSelect');
+      const prodId = select.value;
+      if (!prodId) return;
+
+      const prod = allProducts.find(p => p.id == prodId);
+      const existing = currentOrderItems.find(i => i.id == prodId);
+
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        currentOrderItems.push({ ...prod, qty: 1 });
+      }
+      select.value = '';
+      renderOrderItems();
+    }
+
+    function changeQty(idx, val) {
+      if (!currentOrderItems[idx]) return;
+      currentOrderItems[idx].qty += val;
+      if (currentOrderItems[idx].qty < 1) currentOrderItems[idx].qty = 1;
+      renderOrderItems();
+    }
+
+    function setQty(idx, val) {
+      let q = parseInt(val) || 1;
+      if (q < 1) q = 1;
+      currentOrderItems[idx].qty = q;
+      renderOrderItems();
+    }
+
+    function removeItem(idx) {
+      currentOrderItems.splice(idx, 1);
+      renderOrderItems();
+    }
+
+    async function submitSupplyOrder() {
+      if (currentOrderItems.length === 0) return alert('Add items first');
+
+      const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
+      const payload = {
+        items: currentOrderItems,
+        status: 'Pending',
+        created_by: currentUser.name || currentUser.email || 'Manager'
+      };
+
+      const { error } = await _supabase.from('procurement_orders').insert([payload]);
+      if (error) {
+        alert('Error creating order: ' + error.message);
+      } else {
+        closeModal('createOrderModal');
+        fetchOrders();
+      }
+    }
+
+    async function updateOrderStatus(id, newStatus) {
+      const { error } = await _supabase.from('procurement_orders').update({ status: newStatus }).eq('id', id);
+      if (!error) fetchOrders();
+    }
+
+    function exportOrderPDF(orderId) {
+      const order = allOrdersList.find(o => o.id === orderId);
+      if (!order) return;
+
+      document.getElementById('pdfOrderId').innerText = order.id;
+      document.getElementById('pdfDate').innerText = new Date(order.created_at).toLocaleDateString();
+      document.getElementById('pdfStatus').innerText = order.status;
+
+      const body = document.getElementById('pdfTableBody');
+      body.innerHTML = '';
+      order.items.forEach(i => {
+        body.innerHTML += `
+          <tr>
+            <td style="text-align: center;"><img src="${i.image_url || 'https://via.placeholder.com/40'}" crossorigin="anonymous"></td>
+            <td><strong>${i.sku || 'N/A'}</strong></td>
+            <td>${i.name_en || i.name_ar}</td>
+            <td style="font-weight: bold; text-align: center; font-size: 14px;">${i.qty}</td>
+          </tr>
+        `;
+      });
+
+      const element = document.getElementById('pdfRenderArea');
+      element.style.display = 'block';
+
+      html2pdf().set({
+        margin: [10, 10, 10, 10],
+        filename: `Procurement_Order_${order.id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(element).save().then(() => element.style.display = 'none');
+    }
+
+    function exportOrderExcel(orderId) {
+      const order = allOrdersList.find(o => o.id === orderId);
+      if (!order) return;
+
+      let csvContent = "data:text/csv;charset=utf-8,SKU,Product Name,Quantity Requested,Status\n";
+      order.items.forEach(i => {
+        csvContent += `"${i.sku || 'N/A'}","${i.name_en || i.name_ar}",${i.qty},${order.status}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Procurement_Order_${order.id}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    document.addEventListener('DOMContentLoaded', initProcurement);
+  </script>
+</body>
+</html>
