@@ -1,4 +1,5 @@
 let products = [];
+let filteredProducts = [];
 let invCurrentUser = {};
 
 // Safe currentUser retrieval
@@ -38,6 +39,7 @@ async function loadProducts() {
   // Filter products by brand permission
   const userBrandPermission = invCurrentUser.brand_permission || invCurrentUser.brand || 'All';
   products = filterProductsByBrandPermission(rawProducts, userBrandPermission);
+  filteredProducts = [...products];
 
   renderTable();
   applyUserPermissions();
@@ -68,21 +70,54 @@ function filterProductsByBrandPermission(allProducts, userBrandPermission) {
   });
 }
 
-// 3. Render inventory table
+// 3. Search Handler (Filter by SKU, Name Ar, Name En)
+function handleSearch() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  if (!query) {
+    filteredProducts = [...products];
+  } else {
+    filteredProducts = products.filter(p => {
+      const sku = (p.sku || '').toLowerCase();
+      const nameAr = (p.name_ar || '').toLowerCase();
+      const nameEn = (p.name_en || '').toLowerCase();
+
+      return sku.includes(query) || nameAr.includes(query) || nameEn.includes(query);
+    });
+  }
+
+  renderTable();
+}
+
+// 4. Open Image Preview Modal
+function openImagePreview(url) {
+  const imgElem = document.getElementById('previewImageSrc');
+  if (imgElem) imgElem.src = url;
+  const modal = document.getElementById('imagePreviewModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+// 5. Render inventory table
 function renderTable() {
   const tbody = document.getElementById('inventoryBody');
+  const countElem = document.getElementById('displayedCount');
+
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">No products found for this branch or brand.</td></tr>';
+  // Update displayed count counter
+  if (countElem) countElem.innerText = filteredProducts.length;
+
+  if (filteredProducts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">No products found.</td></tr>';
     return;
   }
 
   const isUserAdmin = isInvAdminOrManager();
 
-  products.forEach(p => {
+  filteredProducts.forEach(p => {
     const isLow = p.quantity <= (p.min_quantity || 0);
+    const imgUrl = p.image_url || 'https://via.placeholder.com/50';
     
     const actionsCell = isUserAdmin ? `
       <td>
@@ -96,7 +131,13 @@ function renderTable() {
     tbody.innerHTML += `
       <tr style="${isLow ? 'background-color: rgba(255, 0, 0, 0.1);' : ''}">
         <td><input type="checkbox" class="prod-select" value="${p.id}"></td>
-        <td><img src="${p.image_url || 'https://via.placeholder.com/50'}" width="40" height="40" style="object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/40'"></td>
+        <td>
+          <img src="${imgUrl}" width="40" height="40" 
+               style="object-fit:cover; border-radius:4px; cursor:pointer;" 
+               onerror="this.src='https://via.placeholder.com/40'" 
+               onclick="openImagePreview('${imgUrl}')" 
+               title="Click to view image">
+        </td>
         <td>${p.sku || '-'}</td>
         <td>${p.name_ar || '-'}</td>
         <td>${p.name_en || '-'}</td>
@@ -111,7 +152,7 @@ function renderTable() {
   });
 }
 
-// 4. Apply UI restrictions for regular users
+// 6. Apply UI restrictions for regular users
 function applyUserPermissions() {
   if (!isInvAdminOrManager()) {
     const uploadBtn = document.querySelector('button[onclick*="excelInput"]');
@@ -124,7 +165,7 @@ function applyUserPermissions() {
   }
 }
 
-// 5. Download Excel template
+// 7. Download Excel template
 function downloadTemplate() {
   const template = [
     { 
@@ -156,7 +197,7 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
-// 6. Handle Excel Upload
+// 8. Handle Excel Upload
 async function handleExcelUpload(e) {
   if (!isInvAdminOrManager()) {
     alert("Sorry, you do not have permission to add or edit products.");
@@ -224,7 +265,7 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// 7. Open Edit Modal
+// 9. Open Edit Modal
 function openEditModal(id) {
   if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
 
@@ -251,7 +292,7 @@ function closeModal(id) {
   if (el) el.style.display = 'none'; 
 }
 
-// 8. Save edited product
+// 10. Save edited product
 async function saveProductEdit(e) {
   e.preventDefault();
   if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
@@ -279,14 +320,14 @@ async function saveProductEdit(e) {
   }
 }
 
-// 9. Toggle active/disabled status
+// 11. Toggle active/disabled status
 async function toggleStatus(id, currentStatus) {
   if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to toggle status.");
   await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
   loadProducts();
 }
 
-// 10. Delete selected products
+// 12. Delete selected products
 async function deleteSelected() {
   if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to delete products.");
 
@@ -302,10 +343,10 @@ function toggleSelectAll(master) {
   document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
 }
 
-// 11. Export products to Excel
+// 13. Export products to Excel
 function exportSelected() {
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
-  const listToExport = ids.length > 0 ? products.filter(p => ids.includes(p.id)) : products;
+  const listToExport = ids.length > 0 ? filteredProducts.filter(p => ids.includes(p.id)) : filteredProducts;
   
   if (listToExport.length === 0) return alert("No products to export.");
 
