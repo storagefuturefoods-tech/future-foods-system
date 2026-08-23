@@ -5,26 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Home</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Font Awesome Library for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <header>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="inventory.html">Inventory</a>
-      <a href="supply-requests.html">Supply Requests</a>
-      <a href="settings.html">Settings</a>
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+    <nav style="display: flex; gap: 15px;">
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
     </nav>
-    <div class="user-info">
-      <span id="currentUserDisplay"></span>
-      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; line-height: 1;">🚪</button>
+    <div class="user-info" style="display: flex; align-items: center; gap: 10px;">
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
+      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 8px 12px;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
     </div>
   </header>
 
   <div class="container">
     <div class="card">
       <h2>Welcome to Inventory Management System</h2>
-      <p style="margin-top: 10px;">Select an option from the top navigation bar to get started.</p>
+      <p style="margin-top: 10px;">Select an option from the navigation bar to get started.</p>
     </div>
   </div>
 
