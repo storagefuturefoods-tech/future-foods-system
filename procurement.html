@@ -82,6 +82,7 @@
       border-radius: 6px;
       margin-bottom: 8px;
       border: 1px solid var(--border-color, #333);
+      direction: ltr; /* Ensure layout stays left-to-right */
     }
     .item-row img {
       width: 44px;
@@ -106,7 +107,7 @@
       cursor: pointer;
     }
     .qty-input {
-      width: 55px;
+      width: 60px;
       height: 30px;
       text-align: center;
       background: var(--card-bg, #1e1e1e);
@@ -114,6 +115,7 @@
       border: 1px solid var(--border-color, #555);
       border-radius: 4px;
       font-weight: bold;
+      direction: ltr;
     }
 
     .product-select-card {
@@ -336,20 +338,25 @@
         const formattedDate = order.created_at ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
         const items = order.items || [];
 
-        // Check if there are un-ordered items
+        // Check conditions for headers controls
         const hasUnorderedItems = items.some(i => !i.is_ordered && !i.received);
+        const hasReceivableItems = items.some(i => i.is_ordered && !i.received);
 
         let itemsRowsHtml = items.map((i, idx) => {
           const isOrdered = i.is_ordered === true;
           const isReceived = i.received === true;
 
           return `
-            <div class="item-row" style="${isReceived ? 'opacity:0.7; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
+            <div class="item-row" style="${isReceived ? 'opacity:0.75; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
               
               <div style="display:flex; align-items:center; gap:12px;">
-                <!-- Checkbox for Procurement Manager -->
+                <!-- Selection Checkboxes -->
                 ${(!isOrdered && !isReceived && order.status !== 'Cancelled') ? `
-                  <input type="checkbox" class="order-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;">
+                  <input type="checkbox" class="order-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Ordering">
+                ` : ''}
+
+                ${(isOrdered && !isReceived && order.status !== 'Cancelled') ? `
+                  <input type="checkbox" class="recv-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Receiving">
                 ` : ''}
 
                 <img src="${i.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
@@ -361,29 +368,29 @@
                 </div>
               </div>
 
-              <div style="display:flex; align-items:center; gap:20px;">
+              <div style="display:flex; align-items:center; gap:15px;">
                 
-                <!-- Qty Information -->
+                <!-- Qty Requested -->
                 <div style="text-align:right;">
-                  <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color);">${i.qty}</strong></div>
-                  ${isReceived ? `<div style="font-size:0.85rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || i.qty}</div>` : ''}
+                  <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color); font-size:1rem;">${i.qty}</strong></div>
+                  ${isReceived ? `<div style="font-size:0.8rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || i.qty}</div>` : ''}
                 </div>
 
                 <!-- Action Controls -->
-                <div>
+                <div style="display:flex; align-items:center; gap:10px;">
                   ${order.status === 'Cancelled' ? '' : (
                     isReceived ? `
-                      <span style="color:#10b981; font-weight:bold; font-size:0.8rem;"><i class="fa-solid fa-circle-check"></i> Stock Updated</span>
+                      <span style="color:#10b981; font-weight:bold; font-size:0.8rem;"><i class="fa-solid fa-circle-check"></i> In Stock</span>
                     ` : (
                       !isOrdered ? `
                         <button class="btn" style="background:#3b82f6; padding:4px 10px; font-size:0.75rem;" onclick="markSingleItemOrdered(${order.id}, ${idx})">
-                          <i class="fa-solid fa-paper-plane"></i> Mark Ordered
+                          <i class="fa-solid fa-paper-plane"></i> Order Item
                         </button>
                       ` : `
                         <!-- Warehouse Receiving Controls -->
                         <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
                           <span style="font-size:0.75rem; color:#aaa;">Recv Qty:</span>
-                          <input type="number" id="recv-qty-${order.id}-${idx}" value="${i.qty}" min="0" class="qty-input" style="width:50px; height:26px;">
+                          <input type="number" id="recv-qty-${order.id}-${idx}" value="${i.qty}" min="0" class="qty-input">
                           <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
                             <i class="fa-solid fa-boxes-packing"></i> Receive & Stock
                           </button>
@@ -391,6 +398,13 @@
                       `
                     )
                   )}
+
+                  <!-- Delete Single Item Button -->
+                  ${(!isReceived && order.status !== 'Cancelled') ? `
+                    <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:4px 8px; font-size:0.75rem;" title="Remove this item from order" onclick="removeSingleItemFromOrder(${order.id}, ${idx})">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  ` : ''}
                 </div>
 
               </div>
@@ -409,7 +423,7 @@
               <div style="display:flex; align-items:center; gap:10px;">
                 <span class="status-badge ${statusBadgeClass}">${order.status}</span>
                 ${(order.status === 'Pending' || order.status === 'Ordered') ? `
-                  <button class="btn" style="background:#ef4444; padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); cancelOrder(${order.id})"><i class="fa-solid fa-ban"></i> Cancel</button>
+                  <button class="btn" style="background:#ef4444; padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); cancelOrder(${order.id})"><i class="fa-solid fa-ban"></i> Cancel Order</button>
                 ` : ''}
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderPDF(${order.id})"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderExcel(${order.id})"><i class="fa-solid fa-file-excel"></i> Excel</button>
@@ -418,14 +432,26 @@
 
             <div class="order-body" id="body-${order.id}">
               
-              <!-- Procurement Manager Bulk Actions -->
+              <!-- Procurement Manager Bulk Action -->
               ${hasUnorderedItems && order.status !== 'Cancelled' ? `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59, 130, 246, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:12px; border:1px solid rgba(59, 130, 246, 0.3);">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59, 130, 246, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(59, 130, 246, 0.3);">
                   <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
                     <input type="checkbox" onchange="toggleSelectAllOrderItems(${order.id}, this.checked)"> Select All for Procurement
                   </label>
                   <button class="btn" style="background:#3b82f6; padding:4px 12px; font-size:0.8rem;" onclick="bulkMarkOrdered(${order.id})">
-                    <i class="fa-solid fa-truck-fast"></i> Mark Selected as Ordered (Supplier Request)
+                    <i class="fa-solid fa-paper-plane"></i> Mark Selected as Ordered (Procurement)
+                  </button>
+                </div>
+              ` : ''}
+
+              <!-- Warehouse Manager Bulk Action -->
+              ${hasReceivableItems && order.status !== 'Cancelled' ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16, 185, 129, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(16, 185, 129, 0.3);">
+                  <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
+                    <input type="checkbox" onchange="toggleSelectAllRecvItems(${order.id}, this.checked)"> Select All for Warehouse Receiving
+                  </label>
+                  <button class="btn" style="background:#10b981; padding:4px 12px; font-size:0.8rem;" onclick="bulkMarkReceived(${order.id})">
+                    <i class="fa-solid fa-boxes-packing"></i> Bulk Receive Selected & Update Stock
                   </button>
                 </div>
               ` : ''}
@@ -459,6 +485,10 @@
       document.querySelectorAll(`.order-chk-${orderId}`).forEach(chk => chk.checked = isChecked);
     }
 
+    function toggleSelectAllRecvItems(orderId, isChecked) {
+      document.querySelectorAll(`.recv-chk-${orderId}`).forEach(chk => chk.checked = isChecked);
+    }
+
     // Phase 1: Procurement Manager marks item as ordered
     async function markSingleItemOrdered(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
@@ -479,7 +509,7 @@
       if (!order) return;
 
       const checkedBoxes = document.querySelectorAll(`.order-chk-${orderId}:checked`);
-      if (checkedBoxes.length === 0) return alert('Please select at least one item.');
+      if (checkedBoxes.length === 0) return alert('Please select at least one item to mark as ordered.');
 
       checkedBoxes.forEach(chk => {
         const idx = parseInt(chk.value);
@@ -497,7 +527,7 @@
       if (!error) await initProcurement();
     }
 
-    // Phase 2: Warehouse Manager receives items into stock with actual quantity
+    // Phase 2: Warehouse Manager receives items into stock
     async function markSingleItemReceived(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -523,9 +553,68 @@
         .update({ items: order.items, status: newStatus })
         .eq('id', orderId);
 
-      if (!error) {
-        await initProcurement();
+      if (!error) await initProcurement();
+    }
+
+    async function bulkMarkReceived(orderId) {
+      const order = allOrdersList.find(o => o.id === orderId);
+      if (!order) return;
+
+      const checkedBoxes = document.querySelectorAll(`.recv-chk-${orderId}:checked`);
+      if (checkedBoxes.length === 0) return alert('Please select at least one item to receive into stock.');
+
+      for (let chk of checkedBoxes) {
+        const idx = parseInt(chk.value);
+        const item = order.items[idx];
+        if (item && !item.received) {
+          const inputEl = document.getElementById(`recv-qty-${orderId}-${idx}`);
+          const actualQty = inputEl ? (parseInt(inputEl.value) || 0) : item.qty;
+
+          item.received = true;
+          item.actual_received_qty = actualQty;
+
+          // Update product stock
+          const prod = allProducts.find(p => p.id == item.id);
+          if (prod) {
+            const newQty = prod.quantity + actualQty;
+            await _supabase.from('products').update({ quantity: newQty }).eq('id', prod.id);
+          }
+        }
       }
+
+      const allReceived = order.items.every(i => i.received === true);
+      const newStatus = allReceived ? 'Completed' : 'Partially Received';
+
+      const { error } = await _supabase.from('procurement_orders')
+        .update({ items: order.items, status: newStatus })
+        .eq('id', orderId);
+
+      if (!error) await initProcurement();
+    }
+
+    // Delete single item from order
+    async function removeSingleItemFromOrder(orderId, itemIndex) {
+      const order = allOrdersList.find(o => o.id === orderId);
+      if (!order || !order.items[itemIndex]) return;
+
+      if (!confirm(`Are you sure you want to remove "${order.items[itemIndex].name_en || order.items[itemIndex].name_ar}" from this order?`)) return;
+
+      order.items.splice(itemIndex, 1);
+
+      if (order.items.length === 0) {
+        // If no items remain, cancel or delete the whole order
+        await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
+      } else {
+        const allReceived = order.items.every(i => i.received === true);
+        const allOrdered = order.items.every(i => i.is_ordered || i.received);
+        let newStatus = order.status;
+        if (allReceived) newStatus = 'Completed';
+        else if (allOrdered) newStatus = 'Ordered';
+
+        await _supabase.from('procurement_orders').update({ items: order.items, status: newStatus }).eq('id', orderId);
+      }
+
+      await initProcurement();
     }
 
     function isProductInPendingOrders(productId) {
