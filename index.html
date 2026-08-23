@@ -4,10 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Supply Management</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- HTML to PDF Library with full CORS image support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
@@ -85,7 +88,6 @@
       color: var(--text-muted, #aaa);
     }
 
-    /* Modal Item Styling */
     .modal-low-stock-item {
       display: flex;
       align-items: center;
@@ -105,7 +107,6 @@
       border: 1px solid var(--border-color, #555);
     }
 
-    /* Plus/Minus Qty Control */
     .qty-picker {
       display: flex;
       align-items: center;
@@ -136,7 +137,6 @@
       font-size: 0.85rem;
     }
 
-    /* PDF Printable Area (Hidden by default) */
     #pdfRenderArea {
       display: none;
       background: #ffffff;
@@ -169,13 +169,13 @@
 </head>
 <body>
   <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+    <!-- Navigation Bar with 5 Pages -->
     <nav style="display: flex; align-items: center; gap: 12px;">
       <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-house"></i></a>
       <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
-      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
-      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-clipboard-list"></i></a>
+      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-clipboard-list"></i></a>
       <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
-      <!-- Logout Icon -->
       <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
@@ -190,7 +190,7 @@
 
     <div class="dashboard-grid">
       
-      <!-- Card 1: Low Stock Alerts -->
+      <!-- Card 1: Low Stock Alerts (Limited to max 3 items preview, Displaying Total Count) -->
       <div class="widget-card">
         <div>
           <div class="widget-header">
@@ -206,7 +206,7 @@
         </div>
 
         <button class="btn btn-secondary" onclick="openLowStockModal()" style="margin-top: 15px; text-align: center; font-size: 0.85rem; width: 100%;">
-          View All Low Stock Products <i class="fa-solid fa-expand"></i>
+          View All & Export PDF <i class="fa-solid fa-expand"></i>
         </button>
       </div>
 
@@ -233,16 +233,16 @@
     </div>
   </div>
 
-  <!-- Modal: Low Stock & Purchase PDF Builder -->
+  <!-- Modal: Low Stock View & Export PDF -->
   <div id="lowStockModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width: 650px; max-height: 88vh; display: flex; flex-direction: column;">
       
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
-        <h3 style="margin: 0; color: #f59e0b;"><i class="fa-solid fa-cart-flatbed"></i> Purchase Order List</h3>
+        <h3 style="margin: 0; color: #f59e0b;"><i class="fa-solid fa-cart-flatbed"></i> Low Stock Report & PDF Builder</h3>
         <button onclick="closeModal('lowStockModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
-      <!-- Add Custom Product Option inside Modal -->
+      <!-- Option to append extra product to PDF -->
       <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center;">
         <select id="extraProductSelect" style="flex: 1; padding: 6px 10px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
           <option value="">-- Add Extra Product to PDF --</option>
@@ -250,7 +250,7 @@
         <button class="btn" onclick="addExtraProductToList()" style="padding: 6px 12px; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> Add</button>
       </div>
 
-      <!-- Scrollable Purchase Items List -->
+      <!-- Scrollable List of Low Stock Products -->
       <div style="flex: 1; overflow-y: auto; margin: 15px 0;" id="fullLowStockList"></div>
 
       <!-- Modal Action Footer -->
@@ -280,7 +280,7 @@
         <tr>
           <th style="width: 15%;">Image</th>
           <th style="width: 25%;">SKU</th>
-          <th style="width: 40%;">Product Name (English)</th>
+          <th style="width: 40%;">Product Name</th>
           <th style="width: 20%;">Requested Qty</th>
         </tr>
       </thead>
@@ -292,7 +292,7 @@
   <script src="js/app.js"></script>
   <script>
     let allAvailableProducts = [];
-    let activePurchaseItems = []; // List of products currently inside the modal
+    let activePurchaseItems = [];
 
     async function loadDashboardCards() {
       const { data: products } = await _supabase.from('products').select('*').eq('is_disabled', false);
@@ -302,6 +302,8 @@
         
         // Filter Low Stock Products
         const lowStock = products.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
+        
+        // Update total count badge
         document.getElementById('lowStockCount').innerText = lowStock.length;
 
         const lowContainer = document.getElementById('lowStockPreview');
@@ -310,7 +312,7 @@
         if (lowStock.length === 0) {
           lowContainer.innerHTML = '<p style="text-align:center; color:#10b981; font-size:0.85rem;">All stock levels are optimal 👍</p>';
         } else {
-          // Display maximum 3 items in preview card
+          // Display maximum 3 items only in the display preview card
           lowStock.slice(0, 3).forEach(p => {
             const img = p.image_url || 'https://via.placeholder.com/40';
             const name = p.name_en || p.name_ar;
@@ -319,7 +321,7 @@
                 <img src="${img}" alt="${name}" onerror="this.src='https://via.placeholder.com/40'">
                 <div class="preview-info">
                   <div class="preview-name">${name}</div>
-                  <div class="preview-sub">Current Stock: <strong style="color:#f59e0b;">${p.quantity}</strong> | Min: ${p.min_limit || 5}</div>
+                  <div class="preview-sub">Current Stock: <strong style="color:#f59e0b;">${p.quantity}</strong> | Min Limit: ${p.min_limit || 5}</div>
                 </div>
               </div>
             `;
@@ -366,27 +368,24 @@
       });
     }
 
-    // Open Modal and initialize with Low Stock Items
     function openLowStockModal() {
-      // Default list loaded with low stock products
       activePurchaseItems = allAvailableProducts
         .filter(p => p.quantity <= (p.min_limit || p.min_stock || 5))
         .map(p => ({
           ...p,
-          requestedQty: (p.min_limit || 5) * 2 // Default suggestion quantity
+          requestedQty: (p.min_limit || 5) * 2
         }));
 
       renderModalItemList();
       openModal('lowStockModal');
     }
 
-    // Render Modal Items List with + and - Controls
     function renderModalItemList() {
       const container = document.getElementById('fullLowStockList');
       container.innerHTML = '';
 
       if (activePurchaseItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No products currently selected for purchase.</p>';
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No low-stock products to display.</p>';
         return;
       }
 
@@ -444,7 +443,6 @@
       const prod = allAvailableProducts.find(p => p.id == selectedId);
       if (!prod) return;
 
-      // Check if product already exists in active list
       const existing = activePurchaseItems.find(p => p.id == selectedId);
       if (existing) {
         existing.requestedQty += 1;
@@ -459,7 +457,6 @@
       renderModalItemList();
     }
 
-    // Export PDF formatted for Procurement Department
     function exportPurchasePDF() {
       if (activePurchaseItems.length === 0) {
         return alert("Please select at least one item to export.");
