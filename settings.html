@@ -5,31 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - User Management</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- Font Awesome Icons -->
+  <!-- Font Awesome Library for Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
-  <header>
-    <div class="user-info">
-      <span id="currentUserDisplay"></span>
-    </div>
-    <nav>
-      <a href="#" onclick="logout()" title="Logout" style="color: #e53e3e;"><i class="fa-solid fa-right-from-bracket"></i></a>
-      <a href="settings.html" class="active" title="Settings"><i class="fa-solid fa-gear"></i></a>
-      <a href="supply-requests.html" title="Supply Requests"><i class="fa-solid fa-truck-ramp-box"></i></a>
-      <a href="inventory.html" title="Inventory"><i class="fa-solid fa-boxes-stacked"></i></a>
-      <a href="index.html" title="Home"><i class="fa-solid fa-house"></i></a>
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+    <nav style="display: flex; align-items: center; gap: 12px;">
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="settings.html" class="active" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
+      
+      <!-- Logout icon directly after Settings -->
+      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
     </nav>
+    
+    <div class="user-info" style="display: flex; align-items: center;">
+      <!-- Only user name displays here -->
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
+    </div>
   </header>
 
   <div class="container">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3><i class="fa-solid fa-list-check"></i> Users & Permissions List</h3>
-        <button class="btn" onclick="openModal('userModal')"><i class="fa-solid fa-user-plus"></i> Add New User</button>
+        <h3>Users & Permissions List</h3>
+        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
       </div>
 
       <table>
@@ -52,7 +56,7 @@
   <!-- Modal: Add / Edit User -->
   <div id="userModal" class="modal" style="display: none;">
     <div class="modal-content">
-      <h3 id="modalTitle"><i class="fa-solid fa-user-pen"></i> Add New User</h3>
+      <h3 id="modalTitle">Add New User</h3>
       <form onsubmit="saveUser(event)" style="margin-top:15px;">
         <input type="hidden" id="uId">
         
@@ -90,8 +94,8 @@
         </div>
 
         <div style="display:flex; gap:10px; margin-top:15px;">
-          <button type="submit" class="btn"><i class="fa-solid fa-floppy-disk"></i> Save Data</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')"><i class="fa-solid fa-xmark"></i> Cancel</button>
+          <button type="submit" class="btn">Save Data</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
         </div>
       </form>
     </div>
