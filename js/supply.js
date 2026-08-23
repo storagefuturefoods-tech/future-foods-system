@@ -70,7 +70,6 @@ async function openSupplyModal() {
   const userBrand = (currentUser.brand_permission || currentUser.brand || 'All').trim().toLowerCase();
 
   availableProducts = (data || []).filter(p => {
-    // If Admin or user has "All" permission
     if (
       userBrand === 'all' || 
       userBrand === '' || 
@@ -83,7 +82,6 @@ async function openSupplyModal() {
 
     const prodBrand = (p.brand || '').trim().toLowerCase();
 
-    // Show branch-specific products + shared products
     return (
       prodBrand === userBrand || 
       prodBrand === 'all' || 
@@ -324,7 +322,7 @@ async function loadOrders() {
   tbody.innerHTML = '';
 
   if (ordersList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; color:var(--text-muted);">No supply requests found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; color:var(--text-muted); text-align:center;">No supply requests found.</td></tr>';
     return;
   }
 
