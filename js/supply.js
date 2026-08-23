@@ -207,9 +207,17 @@ function renderCart() {
   cart.forEach((item, index) => {
     const name = item.name_en || item.name_ar;
     const boxCap = item.items_per_box || 1;
+    const imgUrl = item.image_url || 'https://via.placeholder.com/50';
 
     container.innerHTML += `
       <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <img 
+          src="${imgUrl}" 
+          alt="${name}" 
+          style="width: 45px; height: 45px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color, #444); background: #222; flex-shrink: 0; cursor: pointer;"
+          onclick="previewImage('${imgUrl}', '${name}')"
+          onerror="this.src='https://via.placeholder.com/45'"
+        >
         <div style="flex:1;">
           <strong style="font-size:0.9rem;">${name}</strong><br>
           <small style="color:var(--text-muted);">Available: ${item.quantity} | Box Capacity: ${boxCap} Pcs/Box</small>
