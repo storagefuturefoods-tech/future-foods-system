@@ -2,9 +2,8 @@ let usersList = [];
 let settingsCurrentUser = {};
 
 async function initSettings() {
-  console.log("بداية تشغيل الإعدادات...");
+  console.log("Initializing settings...");
 
-  // جلب المستخدم الحالي دون التعارض مع الملفات الأخرى
   try {
     settingsCurrentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
   } catch (e) {
@@ -18,8 +17,8 @@ async function loadUsers() {
   const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
 
   if (error) {
-    console.error("خطأ جلب المستخدمين:", error);
-    alert("خطأ في جلب المستخدمين: " + error.message);
+    console.error("Error fetching users:", error);
+    alert("Error fetching users: " + error.message);
     return;
   }
 
@@ -36,43 +35,40 @@ function renderUsersTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  // فحص صلاحيات الأدمن
   const isSuperAdmin = !settingsCurrentUser.email || 
                        settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
                        settingsCurrentUser.role === 'admin';
 
-  // إخفاء أو إظهار زر إضافة مستخدم
   const addBtn = document.querySelector('button[onclick*="openModal"]');
   if (addBtn) {
     addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
   }
 
-  // إخفاء أو إظهار رأس عمود الإجراءات
   const actionsHeader = document.querySelector('table th:last-child');
   if (actionsHeader) {
     actionsHeader.style.display = isSuperAdmin ? '' : 'none';
   }
 
   if (usersList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">لا يوجد مستخدمون حالياً</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">No users found.</td></tr>';
     return;
   }
 
   usersList.forEach(u => {
     let roleBadge = '';
-    if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;">مدير النظام</span>';
-    else if (u.role === 'store_manager') roleBadge = '<span style="color:#dd6b20; font-weight:bold;">مدير مخزن</span>';
-    else roleBadge = '<span style="color:#3182ce;">شيف / فرع</span>';
+    if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;"><i class="fa-solid fa-user-shield"></i> System Admin</span>';
+    else if (u.role === 'store_manager') roleBadge = '<span style="color:#dd6b20; font-weight:bold;"><i class="fa-solid fa-user-tie"></i> Store Manager</span>';
+    else roleBadge = '<span style="color:#3182ce;"><i class="fa-solid fa-utensils"></i> Chef / Branch</span>';
 
-    let brandDisplay = u.brand_permission || 'غير محدد';
-    if (u.brand_permission === 'All') brandDisplay = 'كل الفروع';
-    else if (u.brand_permission === 'Rudy') brandDisplay = 'Rudy (+ المشترك)';
-    else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ المشترك)';
+    let brandDisplay = u.brand_permission || 'Not Specified';
+    if (u.brand_permission === 'All') brandDisplay = 'All Branches';
+    else if (u.brand_permission === 'Rudy') brandDisplay = 'Rudy (+ Shared)';
+    else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ Shared)';
 
     const actionsTd = isSuperAdmin ? `
       <td>
-        <button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-left:4px;" onclick="openEditUser(${u.id})">تعديل</button>
-        <button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})">حذف</button>
+        <button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-left:4px;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+        <button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button>
       </td>
     ` : '';
 
@@ -100,7 +96,7 @@ function openModal(modalId) {
     document.getElementById('uPass').required = true;
   }
   if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
-  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerText = 'إضافة مستخدم جديد';
+  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Add New User';
 
   modal.style.display = 'flex';
 }
@@ -120,7 +116,7 @@ function openEditUser(id) {
   if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'chef';
   if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
 
-  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerText = 'تعديل بيانات المستخدم';
+  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen"></i> Edit User Details';
   
   const modal = document.getElementById('userModal');
   if (modal) modal.style.display = 'flex';
@@ -149,9 +145,9 @@ async function saveUser(e) {
       brand_permission
     }).eq('id', id);
 
-    if (error) alert("خطأ في التعديل: " + error.message);
+    if (error) alert("Error updating user: " + error.message);
     else {
-      alert("تم تحديث المستخدم بنجاح!");
+      alert("User updated successfully!");
       closeModal('userModal');
       loadUsers();
     }
@@ -164,9 +160,9 @@ async function saveUser(e) {
       brand_permission
     }]);
 
-    if (error) alert("خطأ في إضافة المستخدم: " + error.message);
+    if (error) alert("Error adding user: " + error.message);
     else {
-      alert("تمت إضافة المستخدم بنجاح!");
+      alert("User added successfully!");
       closeModal('userModal');
       loadUsers();
     }
@@ -174,13 +170,12 @@ async function saveUser(e) {
 }
 
 async function deleteUser(id) {
-  if (!confirm("هل أنت تأكد من حذف هذا المستخدم؟")) return;
+  if (!confirm("Are you sure you want to delete this user?")) return;
   const { error } = await _supabase.from('users').delete().eq('id', id);
-  if (error) alert("حدث خطأ أثناء الحذف: " + error.message);
+  if (error) alert("Error deleting user: " + error.message);
   else loadUsers();
 }
 
-// التشغيل المباشر عند التحميل
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initSettings);
 } else {
