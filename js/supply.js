@@ -455,6 +455,22 @@ async function viewOrderDetails(orderId) {
   openModal('orderDetailsModal');
 }
 
+// Helper to format dates nicely for Excel
+function formatDateForExcel(dateString) {
+  if (!dateString) return '-';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+}
+
 // 4. Detailed Excel Export
 async function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
@@ -465,7 +481,7 @@ async function exportOrders() {
   try {
     const targetIds = selectedOrders.map(o => o.id);
 
-    // جلب جميع منتجات الطلبات المحددة
+    // 1. جلب كافة منتجات الطلبات المحددة
     const { data: items, error: itemsErr } = await _supabase
       .from('order_items')
       .select('*')
@@ -473,7 +489,22 @@ async function exportOrders() {
 
     if (itemsErr) return alert("Error fetching order items: " + itemsErr.message);
 
-    // جلب كافة المنتجات للحصول على الأسماء بالعربي والإنجليزي والـ SKU
+    // 2. جلب جميع سجلات الحركات للطلبات المحددة لمعرفة وقت آخر تعديل
+    const { data: logs } = await _supabase
+      .from('order_logs')
+      .select('order_id, created_at')
+      .in('order_id', targetIds)
+      .order('created_at', { ascending: false });
+
+    // إنشاء خريطة لأحدث تاريخ تعديل لكل طلب
+    const lastUpdateMap = {};
+    (logs || []).forEach(l => {
+      if (!lastUpdateMap[l.order_id]) {
+        lastUpdateMap[l.order_id] = l.created_at;
+      }
+    });
+
+    // 3. جلب كافة المنتجات للحصول على الأسماء بالعربي والإنجليزي والـ SKU
     const { data: allProds } = await _supabase.from('products').select('sku, name_ar, name_en');
     
     // إنشاء خريطة للمنتجات للبحث السريع
@@ -486,6 +517,9 @@ async function exportOrders() {
 
     selectedOrders.forEach(o => {
       const orderItems = (items || []).filter(i => i.order_id === o.id);
+      
+      const orderDateFormatted = formatDateForExcel(o.created_at);
+      const lastUpdateFormatted = formatDateForExcel(lastUpdateMap[o.id] || o.updated_at || o.created_at);
 
       if (orderItems.length > 0) {
         orderItems.forEach(i => {
@@ -499,7 +533,9 @@ async function exportOrders() {
             "Product Name (Ar)": matchedProd.name_ar || i.product_name || '-',
             "Product Name (En)": matchedProd.name_en || i.product_name || '-',
             "Quantity (Pcs)": i.quantity_pieces || 0,
-            "Status": o.status || '-'
+            "Status": o.status || '-',
+            "Order Date": orderDateFormatted,
+            "Last Update": lastUpdateFormatted
           });
         });
       } else {
@@ -510,7 +546,9 @@ async function exportOrders() {
           "Product Name (Ar)": 'No items',
           "Product Name (En)": 'No items',
           "Quantity (Pcs)": 0,
-          "Status": o.status || '-'
+          "Status": o.status || '-',
+          "Order Date": orderDateFormatted,
+          "Last Update": lastUpdateFormatted
         });
       }
     });
