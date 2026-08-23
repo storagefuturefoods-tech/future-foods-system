@@ -39,7 +39,7 @@ function closeImagePreview() {
   if (modal) modal.style.display = 'none';
 }
 
-// 1. Open supply modal
+// Open supply modal
 async function openSupplyModal() {
   selectedQuantities = {};
   updateSelectedSummary();
@@ -93,7 +93,7 @@ function populateCategoriesDropdown(products) {
   });
 }
 
-// 2. Render Grid with Direct Qty Modifiers (+ / -)
+// Render Products Grid
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
@@ -123,12 +123,10 @@ function renderProductsGrid(prods) {
         >
         <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.72rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
         
-        <!-- Stock and Box capacity Info -->
         <div style="font-size: 0.62rem; color: var(--text-muted); margin: 2px 0;">
           Stock: <strong style="color:${isOutOfStock ? '#e53e3e' : 'inherit'}">${p.quantity}</strong> | Box: <strong>${boxCap} Pcs</strong>
         </div>
 
-        <!-- Quantity (+ / -) Modifier -->
         ${isOutOfStock ? `
           <div style="font-size: 0.65rem; color: #e53e3e; font-weight: bold; margin-top: 6px;">Out of Stock</div>
         ` : `
@@ -224,11 +222,72 @@ function updateSelectedSummary() {
   if (countEl) countEl.innerText = count;
 }
 
-// Direct Submit without Cart Modal
-async function submitOrderDirect() {
+// -------------------------------------------------------------
+// Open Independent Preview Modal
+// -------------------------------------------------------------
+function openOrderPreview() {
   const selectedIds = Object.keys(selectedQuantities);
   if (selectedIds.length === 0) {
     return alert("Please select at least one product by increasing its quantity!");
+  }
+
+  const previewList = document.getElementById('previewItemsList');
+  if (!previewList) return;
+
+  previewList.innerHTML = '';
+
+  // Render items (Photo, Name, Quantity in Pcs only)
+  selectedIds.forEach(id => {
+    const p = availableProducts.find(item => item.id == id);
+    const qty = selectedQuantities[id];
+    const imgUrl = p.image_url || 'https://via.placeholder.com/50';
+    const name = p.name_en || p.name_ar;
+
+    previewList.innerHTML += `
+      <div class="preview-card-item">
+        <img src="${imgUrl}" alt="${name}" onerror="this.src='https://via.placeholder.com/50'">
+        <div style="flex: 1;">
+          <div style="font-weight: bold; font-size: 0.9rem; color: var(--text-color);">${name}</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
+            Quantity: <strong style="color: var(--primary-color, #2e7d32); font-size:0.95rem;">${qty} Pcs</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  // Render Notes
+  const notes = (document.getElementById('orderNotes')?.value || '').trim();
+  const notesBox = document.getElementById('previewNotesBox');
+  const notesText = document.getElementById('previewNotesText');
+
+  if (notes) {
+    notesText.innerText = notes;
+    notesBox.style.display = 'block';
+  } else {
+    notesBox.style.display = 'none';
+  }
+
+  closeModal('supplyModal');
+  openModal('orderPreviewModal');
+}
+
+function closePreviewAndReturn() {
+  closeModal('orderPreviewModal');
+  openModal('supplyModal');
+}
+
+// -------------------------------------------------------------
+// Confirm and Submit Order
+// -------------------------------------------------------------
+async function confirmAndSubmitOrder() {
+  const selectedIds = Object.keys(selectedQuantities);
+  if (selectedIds.length === 0) return alert("No items selected.");
+
+  const btn = document.getElementById('confirmOrderBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Submitting...';
   }
 
   const currentUser = getCurrentUser();
@@ -250,7 +309,10 @@ async function submitOrderDirect() {
     .select()
     .single();
 
-  if (error) return alert("Failed to submit request: " + error.message);
+  if (error) {
+    if (btn) { btn.disabled = false; btn.innerText = 'Confirm Request'; }
+    return alert("Failed to submit request: " + error.message);
+  }
 
   const orderItems = selectedIds.map(id => {
     const p = availableProducts.find(item => item.id == id);
@@ -272,13 +334,22 @@ async function submitOrderDirect() {
     action_by: empName
   }]);
 
-  alert("Supply Request submitted successfully! ID: " + orderNum);
+  alert("Supply Request submitted successfully! Order ID: " + orderNum);
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerText = 'Confirm Request';
+  }
+
   selectedQuantities = {};
-  closeModal('supplyModal');
+  const notesEl = document.getElementById('orderNotes');
+  if (notesEl) notesEl.value = '';
+
+  closeModal('orderPreviewModal');
   loadOrders();
 }
 
-// Fetch orders
+// Fetch orders list
 async function loadOrders() {
   const filter = document.getElementById('statusFilter')?.value || 'ALL';
   const searchQuery = (document.getElementById('orderSearch')?.value || '').toLowerCase().trim();
