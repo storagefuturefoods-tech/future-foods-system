@@ -1,5 +1,5 @@
 let availableProducts = [];
-let cart = [];
+let selectedQuantities = {}; // { productId: qty }
 let ordersList = [];
 
 // Get current user
@@ -11,12 +11,11 @@ function getCurrentUser() {
   }
 }
 
-// Check if current user is Admin or Store Manager
+// Check Role
 function isAdminOrManager() {
   const u = getCurrentUser();
   const role = u.role || '';
   const email = (u.email || '').toLowerCase();
-  
   return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
 }
 
@@ -28,20 +27,6 @@ function getEmployeeName() {
 function previewImage(src, altText) {
   let modal = document.getElementById('imgPreviewModal');
   let img = document.getElementById('previewImageSrc');
-  
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'imgPreviewModal';
-    modal.className = 'img-preview-modal';
-    modal.onclick = closeImagePreview;
-    modal.innerHTML = `
-      <span style="position: absolute; top: 20px; right: 25px; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer;">&times;</span>
-      <img id="previewImageSrc" src="" alt="Product Preview">
-    `;
-    document.body.appendChild(modal);
-    img = document.getElementById('previewImageSrc');
-  }
-
   if (modal && img) {
     img.src = src;
     img.alt = altText || 'Product Image';
@@ -54,8 +39,11 @@ function closeImagePreview() {
   if (modal) modal.style.display = 'none';
 }
 
-// 1. Open supply modal and fetch products with appropriate filtering
+// 1. Open supply modal
 async function openSupplyModal() {
+  selectedQuantities = {};
+  updateSelectedSummary();
+
   const { data, error } = await _supabase
     .from('products')
     .select('*')
@@ -81,7 +69,6 @@ async function openSupplyModal() {
     }
 
     const prodBrand = (p.brand || '').trim().toLowerCase();
-
     return (
       prodBrand === userBrand || 
       prodBrand === 'all' || 
@@ -100,59 +87,57 @@ function populateCategoriesDropdown(products) {
   if (!catSelect) return;
 
   const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
-  
   catSelect.innerHTML = '<option value="ALL">All Categories</option>';
   categories.forEach(cat => {
     catSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
   });
 }
 
-// 2. Render products grid
+// 2. Render Grid with Direct Qty Modifiers (+ / -)
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
   grid.innerHTML = '';
 
   if (prods.length === 0) {
-    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">No products match your search or category filter.</p>';
+    grid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; padding: 20px; color: var(--text-muted);">No products found.</p>';
     return;
   }
 
   prods.forEach(p => {
     const isOutOfStock = p.quantity <= 0;
-    const isInCart = cart.some(item => item.id === p.id);
     const name = p.name_en || p.name_ar;
     const imgUrl = p.image_url || 'https://via.placeholder.com/100';
+    const boxCap = p.items_per_box || 1;
+    const currentQty = selectedQuantities[p.id] || 0;
+    const isSelected = currentQty > 0;
 
-    let btnDisabled = isOutOfStock || isInCart;
-    let btnText = 'Add';
-    let btnStyle = 'width: 100%; padding: 4px 2px; font-size: 0.72rem; border-radius: 4px; border: none; font-weight: bold; cursor: pointer;';
-
-    if (isOutOfStock) {
-      btnText = 'Out of Stock';
-      btnStyle += ' background: #555; color: #ccc; cursor: not-allowed; opacity: 0.6;';
-    } else if (isInCart) {
-      btnText = 'Added ✔';
-      btnStyle += ' background: #4A5568; color: #fff; cursor: not-allowed; opacity: 0.8;';
-    } else {
-      btnStyle += ' background: var(--primary-color, #2e7d32); color: #fff;';
-    }
-    
     grid.innerHTML += `
-      <div class="product-card">
+      <div class="product-card ${isSelected ? 'selected' : ''}" id="pcard-${p.id}" style="padding: 8px; border: 1px solid var(--border-color, #444); border-radius: 6px; text-align: center; background: var(--card-bg, #1e1e1e);">
         <img 
           src="${imgUrl}" 
           alt="${name}" 
-          title="Click to preview"
+          style="width: 100%; height: 75px; object-fit: cover; border-radius: 4px; cursor: pointer;"
           onclick="previewImage('${imgUrl}', '${name}')"
           onerror="this.src='https://via.placeholder.com/100'"
         >
-        <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.75rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
-        <p style="font-size:0.65rem; color:var(--text-muted); margin: 1px 0;">${p.category || p.brand || ''}</p>
-        <p style="font-size:0.7rem; margin: 2px 0 5px 0;">Available: <strong>${p.quantity}</strong></p>
-        <button style="${btnStyle}" ${btnDisabled ? 'disabled' : ''} onclick="addToCart(${p.id})">
-          ${btnText}
-        </button>
+        <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.72rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
+        
+        <!-- Stock and Box capacity Info -->
+        <div style="font-size: 0.62rem; color: var(--text-muted); margin: 2px 0;">
+          Stock: <strong style="color:${isOutOfStock ? '#e53e3e' : 'inherit'}">${p.quantity}</strong> | Box: <strong>${boxCap} Pcs</strong>
+        </div>
+
+        <!-- Quantity (+ / -) Modifier -->
+        ${isOutOfStock ? `
+          <div style="font-size: 0.65rem; color: #e53e3e; font-weight: bold; margin-top: 6px;">Out of Stock</div>
+        ` : `
+          <div class="qty-control">
+            <button class="qty-btn" onclick="updateItemQty(${p.id}, -1)">-</button>
+            <input type="number" class="qty-input" id="pinput-${p.id}" value="${currentQty}" min="0" max="${p.quantity}" onchange="manualSetQty(${p.id}, this.value)">
+            <button class="qty-btn" onclick="updateItemQty(${p.id}, 1)">+</button>
+          </div>
+        `}
       </div>
     `;
   });
@@ -176,98 +161,74 @@ function filterProducts() {
   renderProductsGrid(filtered);
 }
 
-function addToCart(prodId) {
+function updateItemQty(prodId, change) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
 
-  if (!cart.some(item => item.id === prodId)) {
-    cart.push({ ...prod, reqQty: 1 });
-  }
-  
-  updateCartBadge();
-  filterProducts();
-}
+  let current = selectedQuantities[prodId] || 0;
+  let updated = current + change;
 
-function updateCartBadge() {
-  const badge = document.getElementById('cartCount');
-  if (badge) badge.innerText = cart.length;
-  renderCart();
-}
-
-function renderCart() {
-  const container = document.getElementById('cartItemsList');
-  if (!container) return;
-  container.innerHTML = '';
-
-  if (cart.length === 0) {
-    container.innerHTML = '<p style="text-align:center; padding:15px; color:var(--text-muted);">Cart is empty</p>';
-    return;
+  if (updated < 0) updated = 0;
+  if (updated > prod.quantity) {
+    alert(`Max available stock is ${prod.quantity}`);
+    updated = prod.quantity;
   }
 
-  cart.forEach((item, index) => {
-    const name = item.name_en || item.name_ar;
-    const boxCap = item.items_per_box || 1;
-    const imgUrl = item.image_url || 'https://via.placeholder.com/50';
-
-    container.innerHTML += `
-      <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-        <img 
-          src="${imgUrl}" 
-          alt="${name}" 
-          style="width: 45px; height: 45px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color, #444); background: #222; flex-shrink: 0; cursor: pointer;"
-          onclick="previewImage('${imgUrl}', '${name}')"
-          onerror="this.src='https://via.placeholder.com/45'"
-        >
-        <div style="flex:1;">
-          <strong style="font-size:0.9rem;">${name}</strong><br>
-          <small style="color:var(--text-muted);">Available: ${item.quantity} | Box Capacity: ${boxCap} Pcs/Box</small>
-        </div>
-        <input 
-          type="number" 
-          min="1" 
-          max="${item.quantity}" 
-          value="${item.reqQty}" 
-          oninput="changeCartQty(${index}, this.value)" 
-          style="width: 75px; height: 38px; padding: 2px 5px; font-size: 16px; text-align: center; direction: ltr; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 6px; outline: none;"
-        >
-        <button class="btn btn-danger" style="padding: 6px 10px; height: 38px;" onclick="removeFromCart(${index})">✕</button>
-      </div>
-    `;
-  });
-}
-
-function changeCartQty(index, val) { 
-  let qty = parseInt(val);
-  const max = cart[index].quantity;
-
-  if (isNaN(qty) || qty < 1) {
-    qty = 1;
-  } else if (qty > max) {
-    alert(`Sorry, available stock limit is ${max}!`);
-    qty = max;
+  if (updated === 0) {
+    delete selectedQuantities[prodId];
+  } else {
+    selectedQuantities[prodId] = updated;
   }
-  
-  cart[index].reqQty = qty;
-  renderCart();
+
+  const inputEl = document.getElementById(`pinput-${prodId}`);
+  if (inputEl) inputEl.value = updated;
+
+  const cardEl = document.getElementById(`pcard-${prodId}`);
+  if (cardEl) {
+    if (updated > 0) cardEl.classList.add('selected');
+    else cardEl.classList.remove('selected');
+  }
+
+  updateSelectedSummary();
 }
 
-function removeFromCart(index) { 
-  cart.splice(index, 1); 
-  updateCartBadge(); 
-  filterProducts();
+function manualSetQty(prodId, value) {
+  const prod = availableProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  let val = parseInt(value) || 0;
+  if (val < 0) val = 0;
+  if (val > prod.quantity) {
+    alert(`Max available stock is ${prod.quantity}`);
+    val = prod.quantity;
+  }
+
+  if (val === 0) delete selectedQuantities[prodId];
+  else selectedQuantities[prodId] = val;
+
+  const inputEl = document.getElementById(`pinput-${prodId}`);
+  if (inputEl) inputEl.value = val;
+
+  const cardEl = document.getElementById(`pcard-${prodId}`);
+  if (cardEl) {
+    if (val > 0) cardEl.classList.add('selected');
+    else cardEl.classList.remove('selected');
+  }
+
+  updateSelectedSummary();
 }
 
-async function submitOrder() {
-  if (cart.length === 0) return alert("Cart is empty!");
+function updateSelectedSummary() {
+  const count = Object.keys(selectedQuantities).length;
+  const countEl = document.getElementById('selectedCount');
+  if (countEl) countEl.innerText = count;
+}
 
-  for (let item of cart) {
-    const prodName = item.name_en || item.name_ar;
-    if (!item.reqQty || item.reqQty <= 0) {
-      return alert(`Error: Quantity for product (${prodName}) cannot be zero or less!`);
-    }
-    if (item.reqQty > item.quantity) {
-      return alert(`Error: Requested quantity for (${prodName}) exceeds available stock (${item.quantity})!`);
-    }
+// Direct Submit without Cart Modal
+async function submitOrderDirect() {
+  const selectedIds = Object.keys(selectedQuantities);
+  if (selectedIds.length === 0) {
+    return alert("Please select at least one product by increasing its quantity!");
   }
 
   const currentUser = getCurrentUser();
@@ -282,23 +243,27 @@ async function submitOrder() {
       user_name: empName,
       user_email: currentUser ? currentUser.email : '',
       brand: currentUser ? (currentUser.brand_permission || currentUser.brand) : '',
-      total_items: cart.length,
+      total_items: selectedIds.length,
       notes: notes,
       status: 'New'
     }])
     .select()
     .single();
 
-  if (error) return alert("Failed to create order: " + error.message);
+  if (error) return alert("Failed to submit request: " + error.message);
 
-  const orderItems = cart.map(c => ({
-    order_id: newOrder.id,
-    product_sku: c.sku,
-    product_name: c.name_en || c.name_ar,
-    image_url: c.image_url,
-    quantity_pieces: c.reqQty,
-    box_capacity: c.items_per_box
-  }));
+  const orderItems = selectedIds.map(id => {
+    const p = availableProducts.find(item => item.id == id);
+    const qty = selectedQuantities[id];
+    return {
+      order_id: newOrder.id,
+      product_sku: p.sku,
+      product_name: p.name_en || p.name_ar,
+      image_url: p.image_url,
+      quantity_pieces: qty,
+      box_capacity: p.items_per_box
+    };
+  });
 
   await _supabase.from('order_items').insert(orderItems);
   await _supabase.from('order_logs').insert([{
@@ -307,15 +272,13 @@ async function submitOrder() {
     action_by: empName
   }]);
 
-  alert("Order submitted successfully! Order ID: " + orderNum);
-  cart = [];
-  updateCartBadge();
-  closeModal('cartModal');
+  alert("Supply Request submitted successfully! ID: " + orderNum);
+  selectedQuantities = {};
   closeModal('supplyModal');
   loadOrders();
 }
 
-// 3. Fetch orders and manage status permissions (With Order ID & User Search support)
+// Fetch orders
 async function loadOrders() {
   const filter = document.getElementById('statusFilter')?.value || 'ALL';
   const searchQuery = (document.getElementById('orderSearch')?.value || '').toLowerCase().trim();
@@ -326,7 +289,6 @@ async function loadOrders() {
     query = query.eq('status', filter);
   }
 
-  // البحث في قاعدة البيانات برقم الطلب أو اسم المستخدم
   if (searchQuery) {
     query = query.or(`order_number.ilike.%${searchQuery}%,user_name.ilike.%${searchQuery}%`);
   }
@@ -337,7 +299,6 @@ async function loadOrders() {
   ordersList = data || [];
   const tbody = document.getElementById('ordersBody');
   if (!tbody) return;
-  
   tbody.innerHTML = '';
 
   if (ordersList.length === 0) {
@@ -433,15 +394,8 @@ async function viewOrderDetails(orderId) {
     const logsHtml = (logs || []).map(l => {
       const d = new Date(l.created_at);
       const formattedDate = d.toLocaleString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
       });
-      
       return `
         <li style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-color, #ddd); list-style-type: disc;">
           <span style="font-weight: bold;">${l.status_change}</span>
@@ -464,23 +418,15 @@ async function viewOrderDetails(orderId) {
   openModal('orderDetailsModal');
 }
 
-// Helper to format dates nicely for Excel
 function formatDateForExcel(dateString) {
   if (!dateString) return '-';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return '-';
   return d.toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
   });
 }
 
-// 4. Detailed Excel Export
 async function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
   const selectedOrders = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
@@ -489,44 +435,21 @@ async function exportOrders() {
 
   try {
     const targetIds = selectedOrders.map(o => o.id);
+    const { data: items } = await _supabase.from('order_items').select('*').in('order_id', targetIds);
+    const { data: logs } = await _supabase.from('order_logs').select('order_id, created_at').in('order_id', targetIds).order('created_at', { ascending: false });
 
-    // 1. جلب كافة منتجات الطلبات المحددة
-    const { data: items, error: itemsErr } = await _supabase
-      .from('order_items')
-      .select('*')
-      .in('order_id', targetIds);
-
-    if (itemsErr) return alert("Error fetching order items: " + itemsErr.message);
-
-    // 2. جلب جميع سجلات الحركات للطلبات المحددة لمعرفة وقت آخر تعديل
-    const { data: logs } = await _supabase
-      .from('order_logs')
-      .select('order_id, created_at')
-      .in('order_id', targetIds)
-      .order('created_at', { ascending: false });
-
-    // إنشاء خريطة لأحدث تاريخ تعديل لكل طلب
     const lastUpdateMap = {};
     (logs || []).forEach(l => {
-      if (!lastUpdateMap[l.order_id]) {
-        lastUpdateMap[l.order_id] = l.created_at;
-      }
+      if (!lastUpdateMap[l.order_id]) lastUpdateMap[l.order_id] = l.created_at;
     });
 
-    // 3. جلب كافة المنتجات للحصول على الأسماء بالعربي والإنجليزي والـ SKU
     const { data: allProds } = await _supabase.from('products').select('sku, name_ar, name_en');
-    
-    // إنشاء خريطة للمنتجات للبحث السريع
     const prodMap = {};
-    (allProds || []).forEach(p => {
-      if (p.sku) prodMap[p.sku] = p;
-    });
+    (allProds || []).forEach(p => { if (p.sku) prodMap[p.sku] = p; });
 
     const rows = [];
-
     selectedOrders.forEach(o => {
       const orderItems = (items || []).filter(i => i.order_id === o.id);
-      
       const orderDateFormatted = formatDateForExcel(o.created_at);
       const lastUpdateFormatted = formatDateForExcel(lastUpdateMap[o.id] || o.updated_at || o.created_at);
 
@@ -534,7 +457,6 @@ async function exportOrders() {
         orderItems.forEach(i => {
           const sku = i.product_sku || '-';
           const matchedProd = prodMap[sku] || {};
-
           rows.push({
             "Order Number": o.order_number || '-',
             "Requested By": o.user_name || '-',
@@ -566,7 +488,6 @@ async function exportOrders() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Orders Detailed");
     XLSX.writeFile(wb, "Supply_Orders_Detailed_Export.xlsx");
-
   } catch (e) {
     console.error("Export error:", e);
     alert("An error occurred during export.");
