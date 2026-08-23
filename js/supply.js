@@ -206,11 +206,13 @@ function renderCart() {
 
   cart.forEach((item, index) => {
     const name = item.name_en || item.name_ar;
+    const boxCap = item.items_per_box || 1;
+
     container.innerHTML += `
       <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="flex:1;">
           <strong style="font-size:0.9rem;">${name}</strong><br>
-          <small style="color:var(--text-muted);">Category: ${item.category || '-'} | Available: ${item.quantity}</small>
+          <small style="color:var(--text-muted);">Available: ${item.quantity} | Box Capacity: ${boxCap} Pcs/Box</small>
         </div>
         <input 
           type="number" 
