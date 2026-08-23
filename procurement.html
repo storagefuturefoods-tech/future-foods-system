@@ -124,6 +124,11 @@
       border-radius: 8px;
       margin-bottom: 8px;
       cursor: pointer;
+      transition: background 0.2s;
+    }
+    .product-select-card.added {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.08);
     }
     .product-select-card.disabled {
       opacity: 0.5;
@@ -174,7 +179,7 @@
       </button>
     </div>
 
-    <!-- Tabs Filter with Cancelled added -->
+    <!-- Tabs Filter -->
     <div class="tabs-container">
       <button class="tab-btn active" onclick="filterOrders('All', this)">All Orders</button>
       <button class="tab-btn" onclick="filterOrders('Pending', this)">Pending</button>
@@ -214,25 +219,34 @@
 
       <div style="display: flex; gap: 10px; border-top: 1px solid var(--border-color, #444); padding-top: 10px;">
         <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('createOrderModal')">Cancel</button>
-        <button class="btn" style="flex: 2; background: #10b981;" onclick="submitSupplyOrder()"><i class="fa-solid fa-paper-plane"></i> Submit Order</button>
+        <button class="btn" id="submitBtn" style="flex: 2; background: #10b981;" onclick="submitSupplyOrder()"><i class="fa-solid fa-paper-plane"></i> Submit Order</button>
       </div>
 
     </div>
   </div>
 
-  <!-- Modal 2: Visual Catalog Product Selector -->
+  <!-- Modal 2: Catalog Product Selector with Search -->
   <div id="productSelectorModal" class="modal" style="display:none; z-index: 1050;">
     <div class="modal-content" style="max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
-        <h3 style="margin: 0;">Select Product to Add</h3>
+        <h3 style="margin: 0;">Select Products</h3>
         <button onclick="closeModal('productSelectorModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
+      <!-- Search Input -->
+      <div style="margin-top: 12px;">
+        <input type="text" id="catalogSearchInput" placeholder="🔍 Search by Name or SKU..." oninput="renderCatalogProducts()" style="width: 100%; padding: 8px 12px; background: var(--input-bg, #262626); border: 1px solid var(--border-color, #444); color: var(--text-color, #fff); border-radius: 6px;">
+      </div>
+
       <div style="flex: 1; overflow-y: auto; margin-top: 12px;" id="catalogContainer"></div>
+
+      <div style="border-top: 1px solid var(--border-color, #444); padding-top: 10px; text-align: right;">
+        <button class="btn" style="background: #2563eb;" onclick="closeModal('productSelectorModal')">Done Selecting</button>
+      </div>
     </div>
   </div>
 
-  <!-- Hidden PDF Layout -->
+  <!-- Hidden PDF Area -->
   <div id="pdfRenderArea">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
       <div>
@@ -358,7 +372,7 @@
               <div style="display:flex; align-items:center; gap:10px;">
                 <span class="status-badge ${statusBadgeClass}">${order.status}</span>
                 ${(order.status === 'Pending' || order.status === 'Partially Received') ? `
-                  <button class="btn" style="background:#ef4444; padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); cancelOrder(${order.id})"><i class="fa-solid fa-ban"></i> Cancel Order</button>
+                  <button class="btn" style="background:#ef4444; padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); cancelOrder(${order.id})"><i class="fa-solid fa-ban"></i> Cancel</button>
                 ` : ''}
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderPDF(${order.id})"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderExcel(${order.id})"><i class="fa-solid fa-file-excel"></i> Excel</button>
@@ -398,7 +412,6 @@
       });
     }
 
-    // Modal opens empty by default
     function openCreateOrderModal() {
       currentOrderItems = [];
       document.getElementById('orderNotesInput').value = '';
@@ -406,7 +419,6 @@
       openModal('createOrderModal');
     }
 
-    // Runs ONLY when button clicked
     function autoAddLowStockItems() {
       const lowStockList = allProducts.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
       let addedCount = 0;
@@ -431,19 +443,39 @@
     }
 
     function openProductSelectorModal() {
+      document.getElementById('catalogSearchInput').value = '';
+      renderCatalogProducts();
+      openModal('productSelectorModal');
+    }
+
+    function renderCatalogProducts() {
       const container = document.getElementById('catalogContainer');
+      const query = (document.getElementById('catalogSearchInput').value || '').toLowerCase().trim();
       container.innerHTML = '';
 
-      allProducts.forEach(p => {
+      const filtered = allProducts.filter(p => {
+        const nameEn = (p.name_en || '').toLowerCase();
+        const nameAr = (p.name_ar || '').toLowerCase();
+        const sku = (p.sku || '').toLowerCase();
+        return nameEn.includes(query) || nameAr.includes(query) || sku.includes(query);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No products match your search.</p>';
+        return;
+      }
+
+      filtered.forEach(p => {
         const inPendingOrder = isProductInPendingOrders(p.id);
         const alreadyInList = currentOrderItems.some(item => item.id == p.id);
         const nameEn = p.name_en || p.name_ar;
         const pcsPerCarton = p.pcs_per_carton || p.items_per_box || 1;
 
-        const isBlocked = inPendingOrder || alreadyInList;
+        const isBlocked = inPendingOrder;
 
         container.innerHTML += `
-          <div class="product-select-card ${isBlocked ? 'disabled' : ''}" onclick="${isBlocked ? '' : `selectProductFromCatalog(${p.id})`}">
+          <div class="product-select-card ${alreadyInList ? 'added' : ''} ${isBlocked ? 'disabled' : ''}" 
+               onclick="${isBlocked ? '' : `toggleProductSelection(${p.id})`}">
             <div style="display:flex; align-items:center; gap:12px;">
               <img src="${p.image_url || 'https://via.placeholder.com/44'}" style="width:44px; height:44px; object-fit:cover; border-radius:6px;">
               <div>
@@ -455,23 +487,25 @@
             </div>
             <div>
               ${inPendingOrder ? '<span style="font-size:0.75rem; color:#ef4444; font-weight:bold;">Pending Order Exists</span>' : 
-               (alreadyInList ? '<span style="font-size:0.75rem; color:#3b82f6; font-weight:bold;">Added</span>' : 
-               '<button class="btn" style="padding:4px 10px; font-size:0.75rem; background:#2563eb;">Select</button>')}
+               (alreadyInList ? '<span style="font-size:0.8rem; color:#10b981; font-weight:bold;"><i class="fa-solid fa-check"></i> Added</span>' : 
+               '<button class="btn" style="padding:4px 10px; font-size:0.75rem; background:#2563eb;">+ Add</button>')}
             </div>
           </div>
         `;
       });
-
-      openModal('productSelectorModal');
     }
 
-    function selectProductFromCatalog(productId) {
-      const prod = allProducts.find(p => p.id == productId);
-      if (prod) {
-        currentOrderItems.push({ ...prod, qty: 1 });
-        renderOrderItems();
-        closeModal('productSelectorModal');
+    // Single click adds/removes item without closing modal
+    function toggleProductSelection(productId) {
+      const idx = currentOrderItems.findIndex(i => i.id == productId);
+      if (idx > -1) {
+        currentOrderItems.splice(idx, 1);
+      } else {
+        const prod = allProducts.find(p => p.id == productId);
+        if (prod) currentOrderItems.push({ ...prod, qty: 1 });
       }
+      renderOrderItems();
+      renderCatalogProducts();
     }
 
     function renderOrderItems() {
@@ -527,38 +561,49 @@
     function removeItem(idx) {
       currentOrderItems.splice(idx, 1);
       renderOrderItems();
+      renderCatalogProducts();
     }
 
     async function submitSupplyOrder() {
       if (currentOrderItems.length === 0) return alert('Please add at least one item.');
 
-      const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
-      const notes = document.getElementById('orderNotesInput').value.trim();
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Submitting...';
 
-      const preparedItems = currentOrderItems.map(i => ({
-        id: i.id,
-        sku: i.sku || 'N/A',
-        name_en: i.name_en || i.name_ar || 'Product',
-        image_url: i.image_url || '',
-        pcs_per_carton: i.pcs_per_carton || i.items_per_box || 1,
-        qty: i.qty,
-        received: false
-      }));
+      try {
+        const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
+        const notes = document.getElementById('orderNotesInput').value.trim();
 
-      const payload = {
-        items: preparedItems,
-        notes: notes,
-        status: 'Pending',
-        created_by: currentUser.name || currentUser.email || 'Manager',
-        created_at: new Date().toISOString()
-      };
+        // Optimized lean payload to prevent payload overflow
+        const preparedItems = currentOrderItems.map(i => ({
+          id: i.id,
+          sku: i.sku || 'N/A',
+          name_en: i.name_en || i.name_ar || 'Product',
+          image_url: i.image_url || '',
+          pcs_per_carton: i.pcs_per_carton || i.items_per_box || 1,
+          qty: i.qty,
+          received: false
+        }));
 
-      const { error } = await _supabase.from('procurement_orders').insert([payload]);
-      if (error) {
-        alert('Error submitting order: ' + error.message);
-      } else {
+        const payload = {
+          items: preparedItems,
+          notes: notes,
+          status: 'Pending',
+          created_by: currentUser.name || currentUser.email || 'Manager',
+          created_at: new Date().toISOString()
+        };
+
+        const { error } = await _supabase.from('procurement_orders').insert([payload]);
+        if (error) throw error;
+
         closeModal('createOrderModal');
         await fetchOrders();
+      } catch (err) {
+        alert('Error submitting order: ' + (err.message || 'Network connection error'));
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
       }
     }
 
