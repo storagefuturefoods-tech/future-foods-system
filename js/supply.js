@@ -455,16 +455,75 @@ async function viewOrderDetails(orderId) {
   openModal('orderDetailsModal');
 }
 
-function exportOrders() {
+// 4. Detailed Excel Export
+async function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
-  const listToExport = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
-  
-  if(listToExport.length === 0) return alert("No orders to export");
+  const selectedOrders = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
 
-  const ws = XLSX.utils.json_to_sheet(listToExport);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Orders");
-  XLSX.writeFile(wb, "Supply_Orders_Export.xlsx");
+  if (selectedOrders.length === 0) return alert("No orders to export");
+
+  try {
+    const targetIds = selectedOrders.map(o => o.id);
+
+    // جلب جميع منتجات الطلبات المحددة
+    const { data: items, error: itemsErr } = await _supabase
+      .from('order_items')
+      .select('*')
+      .in('order_id', targetIds);
+
+    if (itemsErr) return alert("Error fetching order items: " + itemsErr.message);
+
+    // جلب كافة المنتجات للحصول على الأسماء بالعربي والإنجليزي والـ SKU
+    const { data: allProds } = await _supabase.from('products').select('sku, name_ar, name_en');
+    
+    // إنشاء خريطة للمنتجات للبحث السريع
+    const prodMap = {};
+    (allProds || []).forEach(p => {
+      if (p.sku) prodMap[p.sku] = p;
+    });
+
+    const rows = [];
+
+    selectedOrders.forEach(o => {
+      const orderItems = (items || []).filter(i => i.order_id === o.id);
+
+      if (orderItems.length > 0) {
+        orderItems.forEach(i => {
+          const sku = i.product_sku || '-';
+          const matchedProd = prodMap[sku] || {};
+
+          rows.push({
+            "Order Number": o.order_number || '-',
+            "Requested By": o.user_name || '-',
+            "SKU": sku,
+            "Product Name (Ar)": matchedProd.name_ar || i.product_name || '-',
+            "Product Name (En)": matchedProd.name_en || i.product_name || '-',
+            "Quantity (Pcs)": i.quantity_pieces || 0,
+            "Status": o.status || '-'
+          });
+        });
+      } else {
+        rows.push({
+          "Order Number": o.order_number || '-',
+          "Requested By": o.user_name || '-',
+          "SKU": '-',
+          "Product Name (Ar)": 'No items',
+          "Product Name (En)": 'No items',
+          "Quantity (Pcs)": 0,
+          "Status": o.status || '-'
+        });
+      }
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orders Detailed");
+    XLSX.writeFile(wb, "Supply_Orders_Detailed_Export.xlsx");
+
+  } catch (e) {
+    console.error("Export error:", e);
+    alert("An error occurred during export.");
+  }
 }
 
 function toggleSelectAllOrders(master) {
