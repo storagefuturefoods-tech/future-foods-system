@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- HTML to PDF Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -15,22 +14,51 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 15px;
+    }
+    .tabs-container {
+      display: flex;
+      gap: 10px;
       margin-bottom: 20px;
+      border-bottom: 2px solid var(--border-color, #333);
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted, #aaa);
+      font-weight: bold;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .tab-btn.active {
+      background: #2563eb;
+      color: #fff;
     }
     .order-card {
       background: var(--card-bg, #1e1e1e);
       border: 1px solid var(--border-color, #333);
       border-radius: 10px;
-      padding: 16px;
       margin-bottom: 15px;
+      overflow: hidden;
     }
     .order-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--border-color, #333);
-      padding-bottom: 10px;
-      margin-bottom: 10px;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+      user-select: none;
+    }
+    .order-body {
+      padding: 15px 18px;
+      border-top: 1px solid var(--border-color, #333);
+      display: none;
+    }
+    .order-body.open {
+      display: block;
     }
     .status-badge {
       padding: 4px 10px;
@@ -40,25 +68,26 @@
       text-transform: uppercase;
     }
     .status-pending { background: #f59e0b; color: #000; }
-    .status-received { background: #10b981; color: #fff; }
-    .status-cancelled { background: #ef4444; color: #fff; }
+    .status-completed { background: #10b981; color: #fff; }
+    .status-partial { background: #3b82f6; color: #fff; }
 
     .item-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px dashed var(--border-color, #333);
+      padding: 10px;
+      background: var(--input-bg, #262626);
+      border-radius: 6px;
+      margin-bottom: 8px;
     }
-    .item-row:last-child { border-bottom: none; }
     .item-row img {
-      width: 36px;
-      height: 36px;
+      width: 44px;
+      height: 44px;
       object-fit: cover;
-      border-radius: 4px;
+      border-radius: 6px;
     }
 
-    /* Qty Control Buttons */
+    /* Qty Picker */
     .qty-picker {
       display: flex;
       align-items: center;
@@ -75,7 +104,7 @@
       cursor: pointer;
     }
     .qty-input {
-      width: 50px;
+      width: 48px;
       height: 28px;
       text-align: center;
       background: var(--card-bg, #1e1e1e);
@@ -83,6 +112,24 @@
       border: 1px solid var(--border-color, #444);
       border-radius: 4px;
       font-weight: bold;
+    }
+
+    /* Selection Modal Items */
+    .product-select-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background: var(--input-bg, #262626);
+      border: 1px solid var(--border-color, #444);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .product-select-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: #ef4444;
     }
 
     /* Hidden Printable Report Area */
@@ -129,33 +176,48 @@
       </button>
     </div>
 
-    <!-- Orders History List -->
+    <!-- Tabs Filter -->
+    <div class="tabs-container">
+      <button class="tab-btn active" onclick="filterOrders('All', this)">All Orders</button>
+      <button class="tab-btn" onclick="filterOrders('Pending', this)">Pending</button>
+      <button class="tab-btn" onclick="filterOrders('Completed', this)">Completed</button>
+    </div>
+
+    <!-- Orders Accordion List -->
     <div id="ordersList">
       <p style="text-align: center; color: var(--text-muted);">Loading procurement orders...</p>
     </div>
   </div>
 
-  <!-- Modal: Create New Supply Order -->
+  <!-- Modal 1: Create Supply Order -->
   <div id="createOrderModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width: 650px; max-height: 88vh; display: flex; flex-direction: column;">
+    <div class="modal-content" style="max-width: 700px; max-height: 90vh; display: flex; flex-direction: column;">
       
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
         <h3 style="margin: 0; color: #2563eb;"><i class="fa-solid fa-boxes-packing"></i> Create Supply Order</h3>
         <button onclick="closeModal('createOrderModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
-      <!-- Add Product to Order Selection -->
-      <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center;">
-        <select id="productSelect" style="flex: 1; padding: 8px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
-          <option value="">-- Select Product --</option>
-        </select>
-        <button class="btn" onclick="addItemToOrder()" style="padding: 8px 14px;"><i class="fa-solid fa-plus"></i> Add</button>
+      <!-- Quick Actions Header -->
+      <div style="display: flex; gap: 10px; margin-top: 12px;">
+        <button class="btn" style="background: #f59e0b; color: #000; font-size: 0.85rem;" onclick="autoAddLowStockItems()">
+          <i class="fa-solid fa-bolt"></i> Auto-Add Low Stock Items
+        </button>
+        <button class="btn" style="background: #2563eb; font-size: 0.85rem;" onclick="openProductSelectorModal()">
+          <i class="fa-solid fa-plus"></i> Add Product from Catalog
+        </button>
       </div>
 
-      <!-- Selected Items Container -->
+      <!-- Order Items List -->
       <div style="flex: 1; overflow-y: auto; margin: 15px 0;" id="orderItemsContainer"></div>
 
-      <!-- Footer Buttons -->
+      <!-- Order Notes Input -->
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted);">Order Notes / Instructions:</label>
+        <input type="text" id="orderNotesInput" placeholder="Optional notes for procurement manager..." style="width: 100%; padding: 8px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; margin-top: 4px;">
+      </div>
+
+      <!-- Modal Actions -->
       <div style="display: flex; gap: 10px; border-top: 1px solid var(--border-color, #444); padding-top: 10px;">
         <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('createOrderModal')">Cancel</button>
         <button class="btn" style="flex: 2; background: #10b981;" onclick="submitSupplyOrder()"><i class="fa-solid fa-paper-plane"></i> Submit Order</button>
@@ -164,7 +226,19 @@
     </div>
   </div>
 
-  <!-- PDF Render Layout -->
+  <!-- Modal 2: Visual Catalog Product Selector -->
+  <div id="productSelectorModal" class="modal" style="display:none; z-index: 1050;">
+    <div class="modal-content" style="max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #444); padding-bottom: 10px;">
+        <h3 style="margin: 0;">Select Product to Add</h3>
+        <button onclick="closeModal('productSelectorModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div style="flex: 1; overflow-y: auto; margin-top: 12px;" id="catalogContainer"></div>
+    </div>
+  </div>
+
+  <!-- Hidden Printable PDF Layout -->
   <div id="pdfRenderArea">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
       <div>
@@ -178,13 +252,18 @@
       </div>
     </div>
 
+    <div style="margin: 10px 0; font-size: 11px; color: #444;">
+      <strong>Notes:</strong> <span id="pdfNotes">N/A</span>
+    </div>
+
     <table>
       <thead>
         <tr>
-          <th style="width: 15%;">Image</th>
-          <th style="width: 25%;">SKU</th>
-          <th style="width: 40%;">Product Name</th>
-          <th style="width: 20%;">Qty Requested</th>
+          <th style="width: 12%;">Image</th>
+          <th style="width: 20%;">SKU</th>
+          <th style="width: 38%;">Product Name (EN)</th>
+          <th style="width: 15%;">Pcs/Carton</th>
+          <th style="width: 15%;">Qty Ordered</th>
         </tr>
       </thead>
       <tbody id="pdfTableBody"></tbody>
@@ -197,6 +276,7 @@
     let allProducts = [];
     let currentOrderItems = [];
     let allOrdersList = [];
+    let activeTabFilter = 'All';
 
     async function initProcurement() {
       await fetchProducts();
@@ -205,82 +285,186 @@
 
     async function fetchProducts() {
       const { data } = await _supabase.from('products').select('*').eq('is_disabled', false);
-      if (data) {
-        allProducts = data;
-        const select = document.getElementById('productSelect');
-        select.innerHTML = '<option value="">-- Select Product --</option>';
-        data.forEach(p => {
-          const name = p.name_en || p.name_ar;
-          select.innerHTML += `<option value="${p.id}">${name} (Stock: ${p.quantity})</option>`;
-        });
-      }
+      if (data) allProducts = data;
     }
 
     async function fetchOrders() {
       const { data } = await _supabase.from('procurement_orders').select('*').order('id', { ascending: false });
+      if (data) {
+        allOrdersList = data;
+        renderOrdersList();
+      }
+    }
+
+    function renderOrdersList() {
       const container = document.getElementById('ordersList');
       container.innerHTML = '';
 
-      if (!data || data.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding: 20px; color: var(--text-muted);">No procurement orders found.</p>';
+      let filtered = allOrdersList;
+      if (activeTabFilter === 'Pending') {
+        filtered = allOrdersList.filter(o => o.status === 'Pending' || o.status === 'Partially Received');
+      } else if (activeTabFilter === 'Completed') {
+        filtered = allOrdersList.filter(o => o.status === 'Completed' || o.status === 'Received');
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding: 30px; color: var(--text-muted);">No procurement orders found for this view.</p>';
         return;
       }
 
-      allOrdersList = data;
-      data.forEach(order => {
-        const statusClass = `status-${order.status.toLowerCase()}`;
+      filtered.forEach(order => {
+        const statusBadgeClass = order.status === 'Completed' || order.status === 'Received' 
+          ? 'status-completed' 
+          : (order.status === 'Partially Received' ? 'status-partial' : 'status-pending');
+
+        const formattedDate = order.created_at ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
         const items = order.items || [];
-        
-        let itemsHtml = items.map(i => `
-          <div class="item-row">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <img src="${i.image_url || 'https://via.placeholder.com/36'}" onerror="this.src='https://via.placeholder.com/36'">
-              <div>
-                <strong style="font-size:0.85rem;">${i.name_en || i.name_ar}</strong>
-                <div style="font-size:0.75rem; color:var(--text-muted);">SKU: ${i.sku || 'N/A'}</div>
+
+        let itemsRowsHtml = items.map((i, idx) => {
+          const isReceived = i.received === true;
+          return `
+            <div class="item-row" style="${isReceived ? 'opacity: 0.6; background: rgba(16, 185, 129, 0.1);' : ''}">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <img src="${i.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
+                <div>
+                  <strong style="font-size:0.9rem; color:var(--text-color);">${i.name_en || i.name_ar}</strong>
+                  <div style="font-size:0.75rem; color:var(--text-muted);">
+                    SKU: ${i.sku || 'N/A'} | Pcs/Carton: <strong>${i.pcs_per_carton || i.items_per_box || 1}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:15px;">
+                <div style="font-size:0.9rem; font-weight:bold;">Qty: ${i.qty}</div>
+                <div>
+                  ${isReceived ? `
+                    <span style="color:#10b981; font-weight:bold; font-size:0.8rem;"><i class="fa-solid fa-check-circle"></i> Item Received</span>
+                  ` : `
+                    <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
+                      <i class="fa-solid fa-check"></i> Mark Received
+                    </button>
+                  `}
+                </div>
               </div>
             </div>
-            <div style="font-weight:bold; font-size:0.9rem;">Qty: ${i.qty}</div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
 
         container.innerHTML += `
           <div class="order-card">
-            <div class="order-header">
-              <div>
-                <strong style="font-size: 1.05rem;">Order #${order.id}</strong>
-                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">${new Date(order.created_at).toLocaleDateString()}</span>
+            <div class="order-header" onclick="toggleAccordion(${order.id})">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <i class="fa-solid fa-chevron-down" id="arrow-${order.id}" style="transition: transform 0.2s;"></i>
+                <strong>Order #${order.id}</strong>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">${formattedDate}</span>
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
-                <span class="status-badge ${statusClass}">${order.status}</span>
-                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="exportOrderPDF(${order.id})" title="Export PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="exportOrderExcel(${order.id})" title="Export Excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                <span class="status-badge ${statusBadgeClass}">${order.status}</span>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderPDF(${order.id})"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderExcel(${order.id})"><i class="fa-solid fa-file-excel"></i> Excel</button>
               </div>
             </div>
 
-            <div>${itemsHtml}</div>
-
-            <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color, #333); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.8rem; color:var(--text-muted);">By: ${order.created_by || 'Staff'}</span>
-              <div style="display:flex; gap:6px;">
-                ${order.status === 'Pending' ? `
-                  <button class="btn" style="background:#10b981; padding:4px 10px; font-size:0.75rem;" onclick="updateOrderStatus(${order.id}, 'Received')">Mark Received</button>
-                  <button class="btn" style="background:#ef4444; padding:4px 10px; font-size:0.75rem;" onclick="updateOrderStatus(${order.id}, 'Cancelled')">Cancel Order</button>
-                ` : ''}
-              </div>
+            <div class="order-body" id="body-${order.id}">
+              ${order.notes ? `<div style="font-size:0.85rem; margin-bottom:10px; padding:6px 10px; background:var(--card-bg); border-radius:4px;"><strong>Notes:</strong> ${order.notes}</div>` : ''}
+              <div>${itemsRowsHtml}</div>
+              <div style="margin-top:10px; font-size:0.8rem; color:var(--text-muted); text-align:right;">Requested by: ${order.created_by || 'Manager'}</div>
             </div>
           </div>
         `;
       });
     }
 
-    function openCreateOrderModal() {
-      currentOrderItems = allProducts
-        .filter(p => p.quantity <= (p.min_limit || p.min_stock || 5))
-        .map(p => ({ ...p, qty: (p.min_limit || 5) * 2 }));
+    function toggleAccordion(orderId) {
+      const body = document.getElementById(`body-${orderId}`);
+      const arrow = document.getElementById(`arrow-${orderId}`);
+      if (body) {
+        body.classList.toggle('open');
+        if (arrow) arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+    }
 
-      renderOrderItems();
+    function filterOrders(status, btn) {
+      activeTabFilter = status;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderOrdersList();
+    }
+
+    // Check if item is already in a pending order (Not yet received)
+    function isProductInPendingOrders(productId) {
+      return allOrdersList.some(order => {
+        if (order.status === 'Completed' || order.status === 'Received') return false;
+        return (order.items || []).some(item => item.id == productId && !item.received);
+      });
+    }
+
+    function openCreateOrderModal() {
+      currentOrderItems = [];
+      document.getElementById('orderNotesInput').value = '';
+      autoAddLowStockItems();
       openModal('createOrderModal');
+    }
+
+    function autoAddLowStockItems() {
+      const lowStockList = allProducts.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
+      
+      lowStockList.forEach(p => {
+        const alreadyInCurrentModal = currentOrderItems.some(item => item.id == p.id);
+        const inPendingOrder = isProductInPendingOrders(p.id);
+
+        if (!alreadyInCurrentModal && !inPendingOrder) {
+          currentOrderItems.push({
+            ...p,
+            qty: (p.min_limit || 5) * 2
+          });
+        }
+      });
+      renderOrderItems();
+    }
+
+    function openProductSelectorModal() {
+      const container = document.getElementById('catalogContainer');
+      container.innerHTML = '';
+
+      allProducts.forEach(p => {
+        const inPendingOrder = isProductInPendingOrders(p.id);
+        const alreadyInList = currentOrderItems.some(item => item.id == p.id);
+        const nameEn = p.name_en || p.name_ar;
+        const pcsPerCarton = p.pcs_per_carton || p.items_per_box || 1;
+
+        const isBlocked = inPendingOrder || alreadyInList;
+
+        container.innerHTML += `
+          <div class="product-select-card ${isBlocked ? 'disabled' : ''}" onclick="${isBlocked ? '' : `selectProductFromCatalog(${p.id})`}">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <img src="${p.image_url || 'https://via.placeholder.com/44'}" style="width:44px; height:44px; object-fit:cover; border-radius:6px;">
+              <div>
+                <strong style="font-size:0.88rem; color:var(--text-color);">${nameEn}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">
+                  SKU: ${p.sku || 'N/A'} | Stock: <strong style="color:${p.quantity <= 5 ? '#ef4444' : '#10b981'}">${p.quantity}</strong> | Pcs/Carton: ${pcsPerCarton}
+                </div>
+              </div>
+            </div>
+            <div>
+              ${inPendingOrder ? '<span style="font-size:0.75rem; color:#ef4444; font-weight:bold;">Pending Order Exists</span>' : 
+               (alreadyInList ? '<span style="font-size:0.75rem; color:#3b82f6; font-weight:bold;">Added</span>' : 
+               '<button class="btn" style="padding:4px 10px; font-size:0.75rem; background:#2563eb;">Select</button>')}
+            </div>
+          </div>
+        `;
+      });
+
+      openModal('productSelectorModal');
+    }
+
+    function selectProductFromCatalog(productId) {
+      const prod = allProducts.find(p => p.id == productId);
+      if (prod) {
+        currentOrderItems.push({ ...prod, qty: 1 });
+        renderOrderItems();
+        closeModal('productSelectorModal');
+      }
     }
 
     function renderOrderItems() {
@@ -288,18 +472,21 @@
       container.innerHTML = '';
 
       if (currentOrderItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No items added to order.</p>';
+        container.innerHTML = '<p style="text-align:center; padding:30px; color:var(--text-muted);">No products currently added to order.</p>';
         return;
       }
 
       currentOrderItems.forEach((item, idx) => {
+        const pcsPerCarton = item.pcs_per_carton || item.items_per_box || 1;
         container.innerHTML += `
-          <div class="item-row" style="background:var(--input-bg); padding:8px; border-radius:6px; margin-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <img src="${item.image_url || 'https://via.placeholder.com/36'}">
+          <div class="item-row">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <img src="${item.image_url || 'https://via.placeholder.com/44'}">
               <div>
-                <strong style="font-size:0.85rem;">${item.name_en || item.name_ar}</strong>
-                <div style="font-size:0.75rem; color:var(--text-muted);">SKU: ${item.sku || 'N/A'}</div>
+                <strong style="font-size:0.88rem;">${item.name_en || item.name_ar}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">
+                  SKU: ${item.sku || 'N/A'} | Current Stock: <strong>${item.quantity}</strong> | Pcs/Carton: <strong>${pcsPerCarton}</strong>
+                </div>
               </div>
             </div>
 
@@ -309,33 +496,16 @@
                 <input type="number" class="qty-input" value="${item.qty}" onchange="setQty(${idx}, this.value)">
                 <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
               </div>
-              <button onclick="removeItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+              <button onclick="removeItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Remove"><i class="fa-solid fa-trash"></i></button>
             </div>
           </div>
         `;
       });
     }
 
-    function addItemToOrder() {
-      const select = document.getElementById('productSelect');
-      const prodId = select.value;
-      if (!prodId) return;
-
-      const prod = allProducts.find(p => p.id == prodId);
-      const existing = currentOrderItems.find(i => i.id == prodId);
-
-      if (existing) {
-        existing.qty += 1;
-      } else {
-        currentOrderItems.push({ ...prod, qty: 1 });
-      }
-      select.value = '';
-      renderOrderItems();
-    }
-
-    function changeQty(idx, val) {
+    function changeQty(idx, change) {
       if (!currentOrderItems[idx]) return;
-      currentOrderItems[idx].qty += val;
+      currentOrderItems[idx].qty += change;
       if (currentOrderItems[idx].qty < 1) currentOrderItems[idx].qty = 1;
       renderOrderItems();
     }
@@ -353,27 +523,64 @@
     }
 
     async function submitSupplyOrder() {
-      if (currentOrderItems.length === 0) return alert('Add items first');
+      if (currentOrderItems.length === 0) return alert('Please add at least one item.');
 
       const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
+      const notes = document.getElementById('orderNotesInput').value.trim();
+
+      const preparedItems = currentOrderItems.map(i => ({
+        id: i.id,
+        sku: i.sku || 'N/A',
+        name_en: i.name_en || i.name_ar || 'Product',
+        image_url: i.image_url || '',
+        pcs_per_carton: i.pcs_per_carton || i.items_per_box || 1,
+        qty: i.qty,
+        received: false
+      }));
+
       const payload = {
-        items: currentOrderItems,
+        items: preparedItems,
+        notes: notes,
         status: 'Pending',
-        created_by: currentUser.name || currentUser.email || 'Manager'
+        created_by: currentUser.name || currentUser.email || 'Manager',
+        created_at: new Date().toISOString()
       };
 
       const { error } = await _supabase.from('procurement_orders').insert([payload]);
       if (error) {
-        alert('Error creating order: ' + error.message);
+        alert('Error submitting order: ' + error.message);
       } else {
         closeModal('createOrderModal');
-        fetchOrders();
+        await fetchOrders();
       }
     }
 
-    async function updateOrderStatus(id, newStatus) {
-      const { error } = await _supabase.from('procurement_orders').update({ status: newStatus }).eq('id', id);
-      if (!error) fetchOrders();
+    // Mark single product inside order as received
+    async function markSingleItemReceived(orderId, itemIndex) {
+      const order = allOrdersList.find(o => o.id === orderId);
+      if (!order || !order.items[itemIndex]) return;
+
+      order.items[itemIndex].received = true;
+
+      // Update actual product stock quantity in DB
+      const itemData = order.items[itemIndex];
+      const prod = allProducts.find(p => p.id == itemData.id);
+      if (prod) {
+        const newQty = prod.quantity + itemData.qty;
+        await _supabase.from('products').update({ quantity: newQty }).eq('id', prod.id);
+      }
+
+      // Check overall order status
+      const allReceived = order.items.every(i => i.received === true);
+      const newStatus = allReceived ? 'Completed' : 'Partially Received';
+
+      const { error } = await _supabase.from('procurement_orders')
+        .update({ items: order.items, status: newStatus })
+        .eq('id', orderId);
+
+      if (!error) {
+        await initProcurement();
+      }
     }
 
     function exportOrderPDF(orderId) {
@@ -381,8 +588,9 @@
       if (!order) return;
 
       document.getElementById('pdfOrderId').innerText = order.id;
-      document.getElementById('pdfDate').innerText = new Date(order.created_at).toLocaleDateString();
+      document.getElementById('pdfDate').innerText = order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A';
       document.getElementById('pdfStatus').innerText = order.status;
+      document.getElementById('pdfNotes').innerText = order.notes || 'N/A';
 
       const body = document.getElementById('pdfTableBody');
       body.innerHTML = '';
@@ -392,6 +600,7 @@
             <td style="text-align: center;"><img src="${i.image_url || 'https://via.placeholder.com/40'}" crossorigin="anonymous"></td>
             <td><strong>${i.sku || 'N/A'}</strong></td>
             <td>${i.name_en || i.name_ar}</td>
+            <td style="text-align: center;">${i.pcs_per_carton || 1}</td>
             <td style="font-weight: bold; text-align: center; font-size: 14px;">${i.qty}</td>
           </tr>
         `;
@@ -413,9 +622,9 @@
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order) return;
 
-      let csvContent = "data:text/csv;charset=utf-8,SKU,Product Name,Quantity Requested,Status\n";
+      let csvContent = "data:text/csv;charset=utf-8,SKU,Product Name (EN),Pcs/Carton,Quantity Requested,Item Received Status\n";
       order.items.forEach(i => {
-        csvContent += `"${i.sku || 'N/A'}","${i.name_en || i.name_ar}",${i.qty},${order.status}\n`;
+        csvContent += `"${i.sku || 'N/A'}","${i.name_en || i.name_ar}",${i.pcs_per_carton || 1},${i.qty},"${i.received ? 'Received' : 'Pending'}"\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
