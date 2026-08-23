@@ -11,17 +11,21 @@
 </head>
 <body>
   <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
-    <nav style="display: flex; gap: 15px;">
+    <nav style="display: flex; align-items: center; gap: 12px;">
       <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
       <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
       <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
       <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
-    </nav>
-    <div class="user-info" style="display: flex; align-items: center; gap: 10px;">
-      <span id="currentUserDisplay" style="font-weight: 600;"></span>
-      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 8px 12px;">
+      
+      <!-- Logout icon directly after Settings -->
+      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
+    </nav>
+    
+    <div class="user-info" style="display: flex; align-items: center;">
+      <!-- Only user name displays here (permissions/roles like 'All' removed) -->
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
     </div>
   </header>
 
