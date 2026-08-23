@@ -315,12 +315,21 @@ async function submitOrder() {
   loadOrders();
 }
 
-// 3. Fetch orders and manage status permissions
+// 3. Fetch orders and manage status permissions (With Order ID & User Search support)
 async function loadOrders() {
   const filter = document.getElementById('statusFilter')?.value || 'ALL';
+  const searchQuery = (document.getElementById('orderSearch')?.value || '').toLowerCase().trim();
+
   let query = _supabase.from('orders').select('*').order('id', { ascending: false });
   
-  if (filter !== 'ALL' && filter !== 'الكل') query = query.eq('status', filter);
+  if (filter !== 'ALL' && filter !== 'الكل') {
+    query = query.eq('status', filter);
+  }
+
+  // البحث في قاعدة البيانات برقم الطلب أو اسم المستخدم
+  if (searchQuery) {
+    query = query.or(`order_number.ilike.%${searchQuery}%,user_name.ilike.%${searchQuery}%`);
+  }
 
   const { data, error } = await query;
   if (error) return alert("Error fetching orders: " + error.message);
