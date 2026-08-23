@@ -163,15 +163,15 @@
   </style>
 </head>
 <body>
-  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: var(--card-bg, #1e1e1e); border-bottom: 1px solid var(--border-color, #333);">
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
     <nav style="display: flex; align-items: center; gap: 12px;">
-      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px; color: var(--text-color, #fff);"><i class="fa-solid fa-house"></i></a>
-      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px; color: var(--text-color, #fff);"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
       <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-truck-ramp-box"></i></a>
-      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px; color: var(--text-color, #fff);"><i class="fa-solid fa-gear"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
     </nav>
     <div class="user-info">
-      <span id="currentUserDisplay" style="font-weight: 600; color: var(--text-color, #fff);"></span>
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
     </div>
   </header>
 
@@ -290,10 +290,6 @@
     let allOrdersList = [];
     let activeTabFilter = 'All';
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initProcurement();
-    });
-
     async function initProcurement() {
       await fetchProducts();
       await fetchOrders();
@@ -342,6 +338,7 @@
         const formattedDate = order.created_at ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
         const items = order.items || [];
 
+        // Check conditions for headers controls
         const hasUnorderedItems = items.some(i => !i.is_ordered && !i.received);
         const hasReceivableItems = items.some(i => i.is_ordered && !i.received);
 
@@ -351,7 +348,9 @@
 
           return `
             <div class="item-row" style="${isReceived ? 'opacity:0.75; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
+              
               <div style="display:flex; align-items:center; gap:12px;">
+                <!-- Selection Checkboxes -->
                 ${(!isOrdered && !isReceived && order.status !== 'Cancelled') ? `
                   <input type="checkbox" class="order-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Ordering">
                 ` : ''}
@@ -370,11 +369,14 @@
               </div>
 
               <div style="display:flex; align-items:center; gap:15px;">
+                
+                <!-- Qty Requested -->
                 <div style="text-align:right;">
                   <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color); font-size:1rem;">${i.qty}</strong></div>
                   ${isReceived ? `<div style="font-size:0.8rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || i.qty}</div>` : ''}
                 </div>
 
+                <!-- Action Controls -->
                 <div style="display:flex; align-items:center; gap:10px;">
                   ${order.status === 'Cancelled' ? '' : (
                     isReceived ? `
@@ -385,6 +387,7 @@
                           <i class="fa-solid fa-paper-plane"></i> Order Item
                         </button>
                       ` : `
+                        <!-- Warehouse Receiving Controls -->
                         <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
                           <span style="font-size:0.75rem; color:#aaa;">Recv Qty:</span>
                           <input type="number" id="recv-qty-${order.id}-${idx}" value="${i.qty}" min="0" class="qty-input">
@@ -396,12 +399,14 @@
                     )
                   )}
 
+                  <!-- Delete Single Item Button -->
                   ${(!isReceived && order.status !== 'Cancelled') ? `
                     <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:4px 8px; font-size:0.75rem;" title="Remove this item from order" onclick="removeSingleItemFromOrder(${order.id}, ${idx})">
                       <i class="fa-solid fa-trash"></i>
                     </button>
                   ` : ''}
                 </div>
+
               </div>
             </div>
           `;
@@ -426,6 +431,8 @@
             </div>
 
             <div class="order-body" id="body-${order.id}">
+              
+              <!-- Procurement Manager Bulk Action -->
               ${hasUnorderedItems && order.status !== 'Cancelled' ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59, 130, 246, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(59, 130, 246, 0.3);">
                   <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
@@ -437,6 +444,7 @@
                 </div>
               ` : ''}
 
+              <!-- Warehouse Manager Bulk Action -->
               ${hasReceivableItems && order.status !== 'Cancelled' ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16, 185, 129, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(16, 185, 129, 0.3);">
                   <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
@@ -481,6 +489,7 @@
       document.querySelectorAll(`.recv-chk-${orderId}`).forEach(chk => chk.checked = isChecked);
     }
 
+    // Phase 1: Procurement Manager marks item as ordered
     async function markSingleItemOrdered(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -518,6 +527,7 @@
       if (!error) await initProcurement();
     }
 
+    // Phase 2: Warehouse Manager receives items into stock
     async function markSingleItemReceived(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -528,10 +538,11 @@
       order.items[itemIndex].received = true;
       order.items[itemIndex].actual_received_qty = actualQty;
 
+      // Update Inventory Stock
       const itemData = order.items[itemIndex];
       const prod = allProducts.find(p => p.id == itemData.id);
       if (prod) {
-        const newQty = (prod.quantity || 0) + actualQty;
+        const newQty = prod.quantity + actualQty;
         await _supabase.from('products').update({ quantity: newQty }).eq('id', prod.id);
       }
 
@@ -562,9 +573,10 @@
           item.received = true;
           item.actual_received_qty = actualQty;
 
+          // Update product stock
           const prod = allProducts.find(p => p.id == item.id);
           if (prod) {
-            const newQty = (prod.quantity || 0) + actualQty;
+            const newQty = prod.quantity + actualQty;
             await _supabase.from('products').update({ quantity: newQty }).eq('id', prod.id);
           }
         }
@@ -580,6 +592,7 @@
       if (!error) await initProcurement();
     }
 
+    // Delete single item from order
     async function removeSingleItemFromOrder(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -589,6 +602,7 @@
       order.items.splice(itemIndex, 1);
 
       if (order.items.length === 0) {
+        // If no items remain, cancel or delete the whole order
         await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
       } else {
         const allReceived = order.items.every(i => i.received === true);
@@ -601,12 +615,6 @@
       }
 
       await initProcurement();
-    }
-
-    async function cancelOrder(orderId) {
-      if (!confirm('Are you sure you want to cancel this entire order?')) return;
-      const { error } = await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
-      if (!error) await initProcurement();
     }
 
     function isProductInPendingOrders(productId) {
@@ -624,7 +632,7 @@
     }
 
     function autoAddLowStockItems() {
-      const lowStockList = allProducts.filter(p => (p.quantity || 0) <= (p.min_limit || p.min_stock || 5));
+      const lowStockList = allProducts.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
       let addedCount = 0;
 
       lowStockList.forEach(p => {
@@ -718,93 +726,95 @@
         container.innerHTML += `
           <div class="item-row">
             <div style="display:flex; align-items:center; gap:12px;">
-              <img src="${item.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
+              <img src="${item.image_url || 'https://via.placeholder.com/44'}">
               <div>
-                <strong style="font-size:0.9rem; color:var(--text-color);">${item.name_en || item.name_ar}</strong>
-                <div style="font-size:0.75rem; color:var(--text-muted);">SKU: ${item.sku || 'N/A'}</div>
+                <strong style="font-size:0.88rem;">${item.name_en || item.name_ar}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">
+                  SKU: ${item.sku || 'N/A'} | Current Stock: <strong>${item.quantity}</strong>
+                </div>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
+
+            <div style="display:flex; align-items:center; gap:8px;">
               <div class="qty-picker">
-                <button class="qty-btn" onclick="updateItemQty(${idx}, -1)">-</button>
-                <input type="number" class="qty-input" value="${item.qty}" min="1" onchange="setItemQtyDirect(${idx}, this.value)">
-                <button class="qty-btn" onclick="updateItemQty(${idx}, 1)">+</button>
+                <button class="qty-btn" onclick="changeQty(${idx}, -1)">-</button>
+                <input type="number" class="qty-input" value="${item.qty}" onchange="setQty(${idx}, this.value)">
+                <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
               </div>
-              <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:4px 8px;" onclick="removeModalItem(${idx})">
-                <i class="fa-solid fa-trash"></i>
-              </button>
+              <button onclick="removeItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Remove"><i class="fa-solid fa-trash"></i></button>
             </div>
           </div>
         `;
       });
     }
 
-    function updateItemQty(index, change) {
-      if (currentOrderItems[index]) {
-        currentOrderItems[index].qty = Math.max(1, (currentOrderItems[index].qty || 1) + change);
-        renderOrderItems();
-      }
-    }
-
-    function setItemQtyDirect(index, value) {
-      if (currentOrderItems[index]) {
-        currentOrderItems[index].qty = Math.max(1, parseInt(value) || 1);
-        renderOrderItems();
-      }
-    }
-
-    function removeModalItem(index) {
-      currentOrderItems.splice(index, 1);
+    function changeQty(idx, change) {
+      if (!currentOrderItems[idx]) return;
+      currentOrderItems[idx].qty += change;
+      if (currentOrderItems[idx].qty < 1) currentOrderItems[idx].qty = 1;
       renderOrderItems();
     }
 
-    async function submitSupplyOrder() {
-      if (currentOrderItems.length === 0) return alert('Please add at least one product.');
+    function setQty(idx, val) {
+      let q = parseInt(val) || 1;
+      if (q < 1) q = 1;
+      currentOrderItems[idx].qty = q;
+      renderOrderItems();
+    }
 
-      const notes = document.getElementById('orderNotesInput').value.trim();
+    function removeItem(idx) {
+      currentOrderItems.splice(idx, 1);
+      renderOrderItems();
+      renderCatalogProducts();
+    }
+
+    async function submitSupplyOrder() {
+      if (currentOrderItems.length === 0) return alert('Please add at least one item.');
+
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
       submitBtn.innerText = 'Submitting...';
 
-      const payload = {
-        status: 'Pending',
-        notes: notes,
-        items: currentOrderItems.map(i => ({
+      try {
+        const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
+        const notes = document.getElementById('orderNotesInput').value.trim();
+
+        const preparedItems = currentOrderItems.map(i => ({
           id: i.id,
-          sku: i.sku || '',
-          name_en: i.name_en || '',
-          name_ar: i.name_ar || '',
+          sku: i.sku || 'N/A',
+          name_en: i.name_en || i.name_ar || 'Product',
           image_url: i.image_url || '',
-          pcs_per_carton: i.pcs_per_carton || 1,
+          pcs_per_carton: i.pcs_per_carton || i.items_per_box || 1,
           qty: i.qty,
           is_ordered: false,
-          received: false,
-          actual_received_qty: 0
-        })),
-        created_at: new Date().toISOString()
-      };
+          received: false
+        }));
 
-      const { error } = await _supabase.from('procurement_orders').insert([payload]);
+        const payload = {
+          items: preparedItems,
+          notes: notes,
+          status: 'Pending',
+          created_by: currentUser.name || currentUser.email || 'Manager',
+          created_at: new Date().toISOString()
+        };
 
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
+        const { error } = await _supabase.from('procurement_orders').insert([payload]);
+        if (error) throw error;
 
-      if (error) {
-        alert('Error creating order: ' + error.message);
-      } else {
         closeModal('createOrderModal');
-        await initProcurement();
+        await fetchOrders();
+      } catch (err) {
+        alert('Error submitting order: ' + (err.message || 'Network connection error'));
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
       }
     }
 
-    function openModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) modal.style.display = 'flex';
-    }
-
-    function closeModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) modal.style.display = 'none';
+    async function cancelOrder(orderId) {
+      if (!confirm('Are you sure you want to cancel this supply order?')) return;
+      const { error } = await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
+      if (!error) await initProcurement();
     }
 
     function exportOrderPDF(orderId) {
@@ -816,51 +826,54 @@
       document.getElementById('pdfStatus').innerText = order.status;
       document.getElementById('pdfNotes').innerText = order.notes || 'N/A';
 
-      const tbody = document.getElementById('pdfTableBody');
-      tbody.innerHTML = (order.items || []).map(i => `
-        <tr>
-          <td><img src="${i.image_url || 'https://via.placeholder.com/40'}"></td>
-          <td>${i.sku || 'N/A'}</td>
-          <td>${i.name_en || i.name_ar || ''}</td>
-          <td>${i.qty}</td>
-          <td>${i.actual_received_qty || 0}</td>
-        </tr>
-      `).join('');
+      const body = document.getElementById('pdfTableBody');
+      body.innerHTML = '';
+      order.items.forEach(i => {
+        body.innerHTML += `
+          <tr>
+            <td style="text-align: center;"><img src="${i.image_url || 'https://via.placeholder.com/40'}" crossorigin="anonymous"></td>
+            <td><strong>${i.sku || 'N/A'}</strong></td>
+            <td>${i.name_en || i.name_ar}</td>
+            <td style="font-weight: bold; text-align: center; font-size: 14px;">${i.qty}</td>
+            <td style="font-weight: bold; text-align: center; font-size: 14px; color: #10b981;">${i.actual_received_qty || (i.received ? i.qty : 0)}</td>
+          </tr>
+        `;
+      });
 
       const element = document.getElementById('pdfRenderArea');
       element.style.display = 'block';
 
-      const opt = {
-        margin:       10,
-        filename:     `procurement_order_${order.id}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.style.display = 'none';
-      });
+      html2pdf().set({
+        margin: [10, 10, 10, 10],
+        filename: `Procurement_Order_${order.id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(element).save().then(() => element.style.display = 'none');
     }
 
     function exportOrderExcel(orderId) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order) return;
 
-      let csv = 'SKU,Product Name,Requested Qty,Received Qty,Status\n';
-      (order.items || []).forEach(i => {
-        const name = (i.name_en || i.name_ar || '').replace(/,/g, '');
-        csv += `"${i.sku || ''}","${name}",${i.qty},${i.actual_received_qty || 0},"${i.received ? 'Received' : (i.is_ordered ? 'Ordered' : 'Pending')}"\n`;
+      let csvContent = "data:text/csv;charset=utf-8,SKU,Product Name,Qty Requested,Qty Received,Ordered Status,Received Status\n";
+      order.items.forEach(i => {
+        csvContent += `"${i.sku || 'N/A'}","${i.name_en || i.name_ar}",${i.qty},${i.actual_received_qty || 0},"${i.is_ordered ? 'Ordered' : 'Pending'}","${i.received ? 'Received' : 'Pending'}"\n`;
       });
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', `procurement_order_${order.id}.csv`);
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Procurement_Order_${order.id}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    document.addEventListener('DOMContentLoaded', initProcurement);
   </script>
 </body>
 </html>
