@@ -70,6 +70,7 @@
     .status-pending { background: #f59e0b; color: #000; }
     .status-completed { background: #10b981; color: #fff; }
     .status-partial { background: #3b82f6; color: #fff; }
+    .status-cancelled { background: #ef4444; color: #fff; }
 
     .item-row {
       display: flex;
@@ -87,7 +88,6 @@
       border-radius: 6px;
     }
 
-    /* Qty Picker */
     .qty-picker {
       display: flex;
       align-items: center;
@@ -114,7 +114,6 @@
       font-weight: bold;
     }
 
-    /* Selection Modal Items */
     .product-select-card {
       display: flex;
       align-items: center;
@@ -132,7 +131,6 @@
       border-color: #ef4444;
     }
 
-    /* Hidden Printable Report Area */
     #pdfRenderArea {
       display: none;
       background: #ffffff;
@@ -176,14 +174,14 @@
       </button>
     </div>
 
-    <!-- Tabs Filter -->
+    <!-- Tabs Filter with Cancelled added -->
     <div class="tabs-container">
       <button class="tab-btn active" onclick="filterOrders('All', this)">All Orders</button>
       <button class="tab-btn" onclick="filterOrders('Pending', this)">Pending</button>
       <button class="tab-btn" onclick="filterOrders('Completed', this)">Completed</button>
+      <button class="tab-btn" onclick="filterOrders('Cancelled', this)">Cancelled</button>
     </div>
 
-    <!-- Orders Accordion List -->
     <div id="ordersList">
       <p style="text-align: center; color: var(--text-muted);">Loading procurement orders...</p>
     </div>
@@ -198,26 +196,22 @@
         <button onclick="closeModal('createOrderModal')" style="background: none; border: none; color: var(--text-color); font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
-      <!-- Quick Actions Header -->
       <div style="display: flex; gap: 10px; margin-top: 12px;">
-        <button class="btn" style="background: #f59e0b; color: #000; font-size: 0.85rem;" onclick="autoAddLowStockItems()">
-          <i class="fa-solid fa-bolt"></i> Auto-Add Low Stock Items
-        </button>
         <button class="btn" style="background: #2563eb; font-size: 0.85rem;" onclick="openProductSelectorModal()">
           <i class="fa-solid fa-plus"></i> Add Product from Catalog
         </button>
+        <button class="btn" style="background: #f59e0b; color: #000; font-size: 0.85rem;" onclick="autoAddLowStockItems()">
+          <i class="fa-solid fa-bolt"></i> Auto-Add Low Stock Items
+        </button>
       </div>
 
-      <!-- Order Items List -->
       <div style="flex: 1; overflow-y: auto; margin: 15px 0;" id="orderItemsContainer"></div>
 
-      <!-- Order Notes Input -->
       <div style="margin-bottom: 12px;">
         <label style="font-size: 0.8rem; color: var(--text-muted);">Order Notes / Instructions:</label>
         <input type="text" id="orderNotesInput" placeholder="Optional notes for procurement manager..." style="width: 100%; padding: 8px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; margin-top: 4px;">
       </div>
 
-      <!-- Modal Actions -->
       <div style="display: flex; gap: 10px; border-top: 1px solid var(--border-color, #444); padding-top: 10px;">
         <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('createOrderModal')">Cancel</button>
         <button class="btn" style="flex: 2; background: #10b981;" onclick="submitSupplyOrder()"><i class="fa-solid fa-paper-plane"></i> Submit Order</button>
@@ -238,7 +232,7 @@
     </div>
   </div>
 
-  <!-- Hidden Printable PDF Layout -->
+  <!-- Hidden PDF Layout -->
   <div id="pdfRenderArea">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
       <div>
@@ -305,6 +299,8 @@
         filtered = allOrdersList.filter(o => o.status === 'Pending' || o.status === 'Partially Received');
       } else if (activeTabFilter === 'Completed') {
         filtered = allOrdersList.filter(o => o.status === 'Completed' || o.status === 'Received');
+      } else if (activeTabFilter === 'Cancelled') {
+        filtered = allOrdersList.filter(o => o.status === 'Cancelled');
       }
 
       if (filtered.length === 0) {
@@ -313,9 +309,10 @@
       }
 
       filtered.forEach(order => {
-        const statusBadgeClass = order.status === 'Completed' || order.status === 'Received' 
-          ? 'status-completed' 
-          : (order.status === 'Partially Received' ? 'status-partial' : 'status-pending');
+        let statusBadgeClass = 'status-pending';
+        if (order.status === 'Completed' || order.status === 'Received') statusBadgeClass = 'status-completed';
+        else if (order.status === 'Partially Received') statusBadgeClass = 'status-partial';
+        else if (order.status === 'Cancelled') statusBadgeClass = 'status-cancelled';
 
         const formattedDate = order.created_at ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
         const items = order.items || [];
@@ -337,13 +334,13 @@
               <div style="display:flex; align-items:center; gap:15px;">
                 <div style="font-size:0.9rem; font-weight:bold;">Qty: ${i.qty}</div>
                 <div>
-                  ${isReceived ? `
+                  ${order.status === 'Cancelled' ? '' : (isReceived ? `
                     <span style="color:#10b981; font-weight:bold; font-size:0.8rem;"><i class="fa-solid fa-check-circle"></i> Item Received</span>
                   ` : `
                     <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
                       <i class="fa-solid fa-check"></i> Mark Received
                     </button>
-                  `}
+                  `)}
                 </div>
               </div>
             </div>
@@ -360,6 +357,9 @@
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
                 <span class="status-badge ${statusBadgeClass}">${order.status}</span>
+                ${(order.status === 'Pending' || order.status === 'Partially Received') ? `
+                  <button class="btn" style="background:#ef4444; padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); cancelOrder(${order.id})"><i class="fa-solid fa-ban"></i> Cancel Order</button>
+                ` : ''}
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderPDF(${order.id})"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                 <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); exportOrderExcel(${order.id})"><i class="fa-solid fa-file-excel"></i> Excel</button>
               </div>
@@ -391,24 +391,26 @@
       renderOrdersList();
     }
 
-    // Check if item is already in a pending order (Not yet received)
     function isProductInPendingOrders(productId) {
       return allOrdersList.some(order => {
-        if (order.status === 'Completed' || order.status === 'Received') return false;
+        if (order.status === 'Completed' || order.status === 'Received' || order.status === 'Cancelled') return false;
         return (order.items || []).some(item => item.id == productId && !item.received);
       });
     }
 
+    // Modal opens empty by default
     function openCreateOrderModal() {
       currentOrderItems = [];
       document.getElementById('orderNotesInput').value = '';
-      autoAddLowStockItems();
+      renderOrderItems();
       openModal('createOrderModal');
     }
 
+    // Runs ONLY when button clicked
     function autoAddLowStockItems() {
       const lowStockList = allProducts.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
-      
+      let addedCount = 0;
+
       lowStockList.forEach(p => {
         const alreadyInCurrentModal = currentOrderItems.some(item => item.id == p.id);
         const inPendingOrder = isProductInPendingOrders(p.id);
@@ -418,8 +420,13 @@
             ...p,
             qty: (p.min_limit || 5) * 2
           });
+          addedCount++;
         }
       });
+
+      if (addedCount === 0) {
+        alert('No new low-stock items to add (or items are already in a pending order).');
+      }
       renderOrderItems();
     }
 
@@ -472,7 +479,7 @@
       container.innerHTML = '';
 
       if (currentOrderItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:30px; color:var(--text-muted);">No products currently added to order.</p>';
+        container.innerHTML = '<p style="text-align:center; padding:30px; color:var(--text-muted);">No products added yet. Click "Add Product" or "Auto-Add Low Stock".</p>';
         return;
       }
 
@@ -555,14 +562,12 @@
       }
     }
 
-    // Mark single product inside order as received
     async function markSingleItemReceived(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
 
       order.items[itemIndex].received = true;
 
-      // Update actual product stock quantity in DB
       const itemData = order.items[itemIndex];
       const prod = allProducts.find(p => p.id == itemData.id);
       if (prod) {
@@ -570,7 +575,6 @@
         await _supabase.from('products').update({ quantity: newQty }).eq('id', prod.id);
       }
 
-      // Check overall order status
       const allReceived = order.items.every(i => i.received === true);
       const newStatus = allReceived ? 'Completed' : 'Partially Received';
 
@@ -578,6 +582,14 @@
         .update({ items: order.items, status: newStatus })
         .eq('id', orderId);
 
+      if (!error) {
+        await initProcurement();
+      }
+    }
+
+    async function cancelOrder(orderId) {
+      if (!confirm('Are you sure you want to cancel this supply order?')) return;
+      const { error } = await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
       if (!error) {
         await initProcurement();
       }
