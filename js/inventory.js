@@ -1,7 +1,7 @@
 let products = [];
 let invCurrentUser = {};
 
-// جلب المستخدم الحالي بشكل آمن
+// Safe currentUser retrieval
 function getInvCurrentUser() {
   try {
     return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
@@ -10,7 +10,7 @@ function getInvCurrentUser() {
   }
 }
 
-// فحص هل المستخدم مدير نظام أم مدير مخزن
+// Check if user is Admin or Store Manager
 function isInvAdminOrManager() {
   const u = getInvCurrentUser();
   const role = (u.role || '').toLowerCase();
@@ -19,39 +19,34 @@ function isInvAdminOrManager() {
   return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
 }
 
-// 1. تحميل بيانات المستخدم وتصفية المنتجات
+// 1. Fetch products & filter based on user permission
 async function loadProducts() {
   invCurrentUser = getInvCurrentUser();
 
-  // جلب كافة المنتجات من Supabase
   const { data, error } = await _supabase
     .from('products')
     .select('*')
     .order('id', { ascending: true });
 
   if (error) {
-    alert("خطأ في جلب البيانات: " + error.message);
+    alert("Error fetching products: " + error.message);
     return;
   }
 
   const rawProducts = data || [];
 
-  // فلترة المنتجات بناءً على صلاحية البراند المسندة للمستخدم
+  // Filter products by brand permission
   const userBrandPermission = invCurrentUser.brand_permission || invCurrentUser.brand || 'All';
   products = filterProductsByBrandPermission(rawProducts, userBrandPermission);
 
-  // عرض الجدول
   renderTable();
-
-  // تطبيق صلاحيات الإخفاء/الإظهار بناءً على الصلاحية
   applyUserPermissions();
 }
 
-// 2. دالة الفلترة حسب البراند (مرنة وشاملة للمشترك)
+// 2. Flexible brand permission filter
 function filterProductsByBrandPermission(allProducts, userBrandPermission) {
   const userBrand = (userBrandPermission || 'All').trim().toLowerCase();
 
-  // إذا كان المستخدم يملك صلاحية "All" أو "المشترك" أو أدمن
   if (
     userBrand === 'all' || 
     userBrand === '' || 
@@ -62,27 +57,25 @@ function filterProductsByBrandPermission(allProducts, userBrandPermission) {
     return allProducts;
   }
 
-  // فلترة: براند المستخدم الخاص + البراند المشترك
   return allProducts.filter(p => {
     const pBrand = (p.brand || '').trim().toLowerCase();
     return (
       pBrand === userBrand || 
       pBrand === 'all' || 
       pBrand.includes('&') || 
-      pBrand.includes('مشترك') || 
       pBrand.includes('shared')
     );
   });
 }
 
-// 3. عرض جدول المخزون
+// 3. Render inventory table
 function renderTable() {
   const tbody = document.getElementById('inventoryBody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
   if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">لا توجد منتجات مجهزة للعرض لهذا الفرع/البراند.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">No products found for this branch or brand.</td></tr>';
     return;
   }
 
@@ -91,15 +84,14 @@ function renderTable() {
   products.forEach(p => {
     const isLow = p.quantity <= (p.min_quantity || 0);
     
-    // إخفاء أو إظهار أزرار الإجراءات داخل الجدول بناءً على الصلاحيات
     const actionsCell = isUserAdmin ? `
       <td>
-        <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">تعديل</button>
+        <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">Edit</button>
         <button class="btn btn-status-action ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
-          ${p.is_disabled ? 'تفعيل' : 'تعطيل'}
+          ${p.is_disabled ? 'Enable' : 'Disable'}
         </button>
       </td>
-    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">عرض فقط</span></td>`;
+    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">View Only</span></td>`;
 
     tbody.innerHTML += `
       <tr style="${isLow ? 'background-color: rgba(255, 0, 0, 0.1);' : ''}">
@@ -112,17 +104,16 @@ function renderTable() {
         <td><span style="background:var(--input-bg, #eee); padding:2px 6px; border-radius:4px; font-size:0.85rem;">${p.category || '-'}</span></td>
         <td>${p.quantity} ${isLow ? '⚠️' : ''}</td>
         <td>${p.items_per_box || 1}</td>
-        <td>${p.is_disabled ? 'معطل' : 'نشط'}</td>
+        <td>${p.is_disabled ? 'Disabled' : 'Active'}</td>
         ${actionsCell}
       </tr>
     `;
   });
 }
 
-// 4. تطبيق التحكم بالأزرار العليا (منع المستخدم العادي من الإضافة والحذف، وإبقاء التصدير)
+// 4. Apply UI restrictions for regular users
 function applyUserPermissions() {
   if (!isInvAdminOrManager()) {
-    // إخفاء زر الرفع وزر الحذف
     const uploadBtn = document.querySelector('button[onclick*="excelInput"]');
     const deleteBtn = document.querySelector('button[onclick*="deleteSelected"]');
     const fileInput = document.getElementById('excelInput');
@@ -133,7 +124,7 @@ function applyUserPermissions() {
   }
 }
 
-// 5. تحميل نموذج الإكسل
+// 5. Download Excel template
 function downloadTemplate() {
   const template = [
     { 
@@ -165,10 +156,10 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
-// 6. معالجة ورفع ملف الإكسل
+// 6. Handle Excel Upload
 async function handleExcelUpload(e) {
   if (!isInvAdminOrManager()) {
-    alert("عذراً، لا تملك صلاحية إضافة أو تعديل المنتجات.");
+    alert("Sorry, you do not have permission to add or edit products.");
     return;
   }
 
@@ -200,10 +191,10 @@ async function handleExcelUpload(e) {
           validRows.push({
             sku: skuStr,
             image_url: r.image_url || r.Image || '',
-            name_ar: r.name_ar || r['الاسم بالعربي'] || '',
-            name_en: r.name_en || r['الاسم بالانجليزي'] || '',
+            name_ar: r.name_ar || '',
+            name_en: r.name_en || '',
             brand: r.brand || r.Brand || 'Rudy Pizzeria & B-Marlin',
-            category: String(r.category || r.Category || r['التصنيف'] || '').trim(),
+            category: String(r.category || r.Category || '').trim(),
             quantity: parseInt(r.quantity || 0),
             min_quantity: parseInt(r.min_quantity || 5),
             items_per_box: parseInt(r.items_per_box || r.box_capacity || 1)
@@ -212,20 +203,20 @@ async function handleExcelUpload(e) {
       }
 
       if (duplicates.length > 0) {
-        alert(`⚠️ عذراً، تم تجاهل المنتجات المكررة لتكرار رمز SKU:\n${duplicates.join(', ')}`);
+        alert(`⚠️ Duplicate SKU codes ignored:\n${duplicates.join(', ')}`);
       }
 
       if (validRows.length > 0) {
         const { error } = await _supabase.from('products').insert(validRows);
         if (error) {
-          alert("خطأ أثناء إدخال البيانات: " + error.message);
+          alert("Error inserting data: " + error.message);
         } else {
-          alert(`تم رفع ${validRows.length} منتج بنجاح!`);
+          alert(`Successfully uploaded ${validRows.length} products!`);
           loadProducts();
         }
       }
     } catch (err) {
-      alert("حدث خطأ في قراءة ملف الإكسل: " + err.message);
+      alert("Error reading Excel file: " + err.message);
     }
     e.target.value = '';
   };
@@ -233,9 +224,9 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// 7. فتح نافذة التعديل
+// 7. Open Edit Modal
 function openEditModal(id) {
-  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
 
   const p = products.find(x => x.id === id);
   if (!p) return;
@@ -260,10 +251,10 @@ function closeModal(id) {
   if (el) el.style.display = 'none'; 
 }
 
-// 8. حفظ تعديل المنتج
+// 8. Save edited product
 async function saveProductEdit(e) {
   e.preventDefault();
-  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية تعديل المنتجات.");
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
 
   const id = document.getElementById('editProdId').value;
   const catInput = document.getElementById('editCategory');
@@ -281,27 +272,27 @@ async function saveProductEdit(e) {
 
   const { error } = await _supabase.from('products').update(updated).eq('id', id);
   if (error) {
-    alert("خطأ في التعديل: " + error.message);
+    alert("Error updating product: " + error.message);
   } else {
     closeModal('editModal');
     loadProducts();
   }
 }
 
-// 9. تغيير حالة المنتج (تفعيل/تعطيل)
+// 9. Toggle active/disabled status
 async function toggleStatus(id, currentStatus) {
-  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك هذه الصلاحية.");
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to toggle status.");
   await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
   loadProducts();
 }
 
-// 10. حذف المنتجات المحددة
+// 10. Delete selected products
 async function deleteSelected() {
-  if (!isInvAdminOrManager()) return alert("عذراً، لا تملك صلاحية حذف المنتجات.");
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to delete products.");
 
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
-  if (ids.length === 0) return alert("الرجاء تحديد منتجات لحذفها");
-  if (confirm("هل أنت تأكد من حذف المنتجات المحددة؟")) {
+  if (ids.length === 0) return alert("Please select products to delete.");
+  if (confirm("Are you sure you want to delete the selected products?")) {
     await _supabase.from('products').delete().in('id', ids);
     loadProducts();
   }
@@ -311,12 +302,12 @@ function toggleSelectAll(master) {
   document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
 }
 
-// 11. تصدير المنتجات لإكسل (متاح للجميع)
+// 11. Export products to Excel
 function exportSelected() {
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
   const listToExport = ids.length > 0 ? products.filter(p => ids.includes(p.id)) : products;
   
-  if (listToExport.length === 0) return alert("لا توجد منتجات لتصديرها.");
+  if (listToExport.length === 0) return alert("No products to export.");
 
   const ws = XLSX.utils.json_to_sheet(listToExport);
   const wb = XLSX.utils.book_new();
