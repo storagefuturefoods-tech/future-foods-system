@@ -36,7 +36,14 @@
     <div class="card">
       <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom: 15px;">
         <button class="btn" onclick="openSupplyModal()">+ New Supply Request</button>
-        <div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <input 
+            type="text" 
+            id="orderSearch" 
+            placeholder="Search by Order ID or User..." 
+            oninput="loadOrders()" 
+            style="padding: 6px 10px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; outline: none; min-width: 200px;"
+          >
           <select id="statusFilter" onchange="loadOrders()" style="padding: 6px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;">
             <option value="ALL">All Statuses</option>
             <option value="New">New</option>
