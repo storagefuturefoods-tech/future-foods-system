@@ -1,32 +1,30 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الرئيسية</title>
+  <title>Home</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
-    <h1 data-i18n="system_title">مخزن مستقبل الأطعمة</h1>
     <nav>
-      <a href="index.html" data-i18n="nav_home">الرئيسية</a>
-      <a href="inventory.html" data-i18n="nav_inventory">المخزون</a>
-      <a href="supply-requests.html" data-i18n="nav_supply">طلبات التغذية</a>
-      <a href="settings.html" data-i18n="nav_settings">الإعدادات</a>
+      <a href="index.html">Home</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="supply-requests.html">Supply Requests</a>
+      <a href="settings.html">Settings</a>
     </nav>
     <div class="user-info">
       <span id="currentUserDisplay"></span>
-      <button class="btn btn-secondary" onclick="toggleLanguage()">Ar/En</button>
-      <button class="btn btn-danger" onclick="logout()" data-i18n="logout">تسجيل الخروج</button>
+      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; line-height: 1;">🚪</button>
     </div>
   </header>
 
   <div class="container">
     <div class="card">
-      <h2 data-i18n="welcome">مرحباً بك في نظام إدارة مخزن مستقبل الأطعمة</h2>
-      <p style="margin-top: 10px;" data-i18n="welcome_sub">اختر من القائمة العلوية للانتقال للقسم المطلوب.</p>
+      <h2>Welcome to Inventory Management System</h2>
+      <p style="margin-top: 10px;">Select an option from the top navigation bar to get started.</p>
     </div>
   </div>
 
