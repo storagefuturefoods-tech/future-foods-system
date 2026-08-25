@@ -83,7 +83,7 @@
       border-radius: 6px;
       margin-bottom: 8px;
       border: 1px solid var(--border-color, #333);
-      direction: ltr; /* Ensure layout stays left-to-right */
+      direction: ltr;
     }
     .item-row img {
       width: 44px;
@@ -183,7 +183,6 @@
       <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-clipboard-list"></i></a>
       <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
 
-      <!-- Logout Icon -->
       <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
@@ -303,6 +302,17 @@
   <script src="js/supabase-config.js"></script>
   <script src="js/app.js"></script>
   <script>
+    // --- Modal Control Helper Functions ---
+    function openModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.style.display = 'none';
+    }
+
     let allProducts = [];
     let currentOrderItems = [];
     let allOrdersList = [];
@@ -720,7 +730,6 @@
       renderOrderItems();
     }
 
-    // --- RENDER ORDER ITEMS WITH DUAL BOX / PCS INPUTS ---
     function renderOrderItems() {
       const container = document.getElementById('orderItemsContainer');
       container.innerHTML = '';
@@ -748,13 +757,9 @@
 
             <div style="display:flex; align-items:center; gap:12px;">
               
-              <!-- DUAL QUANTITY PICKER (BOXES <-> PCS) -->
               <div class="qty-picker">
-                
-                <!-- Minus Button (Decrements Boxes) -->
                 <button class="qty-btn" onclick="adjustBoxes(${index}, -1)">-</button>
 
-                <!-- Box Input -->
                 <div class="unit-group">
                   <input type="number" id="box-input-${index}" class="qty-input" value="${boxesVal}" min="0.1" step="any" oninput="onBoxInputChange(${index}, this.value)">
                   <span class="unit-label">Boxes</span>
@@ -762,18 +767,14 @@
 
                 <span style="font-weight:bold; color:var(--text-muted); font-size:0.8rem;">=</span>
 
-                <!-- Pcs Input -->
                 <div class="unit-group">
                   <input type="number" id="pcs-input-${index}" class="qty-input" value="${item.qty}" min="1" step="1" oninput="onPcsInputChange(${index}, this.value)">
                   <span class="unit-label">Pcs</span>
                 </div>
 
-                <!-- Plus Button (Increments Boxes) -->
                 <button class="qty-btn" onclick="adjustBoxes(${index}, 1)">+</button>
-
               </div>
 
-              <!-- Delete Item Button -->
               <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:5px 8px;" onclick="removeOrderItem(${index})">
                 <i class="fa-solid fa-trash"></i>
               </button>
@@ -784,7 +785,6 @@
       });
     }
 
-    // Handlers for Dual Input Synchronization
     function onBoxInputChange(index, value) {
       const boxes = parseFloat(value) || 0;
       const pcsPerCarton = parseInt(currentOrderItems[index].pcs_per_carton || currentOrderItems[index].pcs_per_box) || 1;
@@ -931,7 +931,6 @@
       document.body.removeChild(link);
     }
 
-    // Auto-init on page load
     window.addEventListener('DOMContentLoaded', initProcurement);
   </script>
 </body>
