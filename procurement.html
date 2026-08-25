@@ -318,6 +318,10 @@
     let allOrdersList = [];
     let activeTabFilter = 'All';
 
+    window.addEventListener('DOMContentLoaded', () => {
+      initProcurement();
+    });
+
     async function initProcurement() {
       await fetchProducts();
       await fetchOrders();
@@ -633,6 +637,12 @@
       await initProcurement();
     }
 
+    async function cancelOrder(orderId) {
+      if (!confirm(`Are you sure you want to cancel order #${orderId}?`)) return;
+      const { error } = await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
+      if (!error) await initProcurement();
+    }
+
     function isProductInPendingOrders(productId) {
       return allOrdersList.some(order => {
         if (order.status === 'Completed' || order.status === 'Received' || order.status === 'Cancelled') return false;
@@ -724,7 +734,13 @@
         currentOrderItems.splice(idx, 1);
       } else {
         const prod = allProducts.find(p => p.id == productId);
-        if (prod) currentOrderItems.push({ ...prod, qty: parseInt(prod.pcs_per_carton || prod.pcs_per_box) || 1 });
+        if (prod) {
+          const pcsPerCarton = parseInt(prod.pcs_per_carton || prod.pcs_per_box) || 1;
+          currentOrderItems.push({
+            ...prod,
+            qty: pcsPerCarton
+          });
+        }
       }
       renderCatalogProducts();
       renderOrderItems();
@@ -735,85 +751,71 @@
       container.innerHTML = '';
 
       if (currentOrderItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding:20px;">No items selected yet. Click "Add Product from Catalog" to add items.</p>';
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">No items added to this order yet.</p>';
         return;
       }
 
       currentOrderItems.forEach((item, index) => {
         const pcsPerCarton = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
-        const boxesVal = parseFloat((item.qty / pcsPerCarton).toFixed(2));
+        const boxesCount = (item.qty / pcsPerCarton).toFixed(1).replace(/\.0$/, '');
 
         container.innerHTML += `
           <div class="item-row">
             <div style="display:flex; align-items:center; gap:12px;">
               <img src="${item.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
               <div>
-                <strong style="font-size:0.9rem; color:var(--text-color);">${item.name_en || item.name_ar}</strong>
-                <div style="font-size:0.75rem; color:var(--text-muted);">
-                  Box Capacity: <strong>${pcsPerCarton} Pcs/Box</strong> | Stock: ${item.quantity || 0}
-                </div>
+                <strong style="font-size:0.9rem;">${item.name_en || item.name_ar}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">Box Capacity: ${pcsPerCarton} Pcs/Box</div>
               </div>
             </div>
 
-            <div style="display:flex; align-items:center; gap:12px;">
-              
-              <div class="qty-picker">
-                <button class="qty-btn" onclick="adjustBoxes(${index}, -1)">-</button>
-
-                <div class="unit-group">
-                  <input type="number" id="box-input-${index}" class="qty-input" value="${boxesVal}" min="0.1" step="any" oninput="onBoxInputChange(${index}, this.value)">
-                  <span class="unit-label">Boxes</span>
+            <div style="display:flex; align-items:center; gap:15px;">
+              <div class="unit-group">
+                <span class="unit-label">Boxes</span>
+                <div class="qty-picker">
+                  <button class="qty-btn" onclick="updateItemBoxes(${index}, -1)">-</button>
+                  <input type="number" class="qty-input" value="${boxesCount}" step="0.5" min="0.5" onchange="setItemBoxes(${index}, this.value)">
+                  <button class="qty-btn" onclick="updateItemBoxes(${index}, 1)">+</button>
                 </div>
-
-                <span style="font-weight:bold; color:var(--text-muted); font-size:0.8rem;">=</span>
-
-                <div class="unit-group">
-                  <input type="number" id="pcs-input-${index}" class="qty-input" value="${item.qty}" min="1" step="1" oninput="onPcsInputChange(${index}, this.value)">
-                  <span class="unit-label">Pcs</span>
-                </div>
-
-                <button class="qty-btn" onclick="adjustBoxes(${index}, 1)">+</button>
               </div>
 
-              <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:5px 8px;" onclick="removeOrderItem(${index})">
+              <div class="unit-group">
+                <span class="unit-label">Total Pcs</span>
+                <input type="number" class="qty-input" style="width:65px;" value="${item.qty}" min="1" onchange="setItemPcs(${index}, this.value)">
+              </div>
+
+              <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:6px 10px;" onclick="removeOrderItem(${index})">
                 <i class="fa-solid fa-trash"></i>
               </button>
-
             </div>
           </div>
         `;
       });
     }
 
-    function onBoxInputChange(index, value) {
-      const boxes = parseFloat(value) || 0;
-      const pcsPerCarton = parseInt(currentOrderItems[index].pcs_per_carton || currentOrderItems[index].pcs_per_box) || 1;
-      const calculatedPcs = Math.round(boxes * pcsPerCarton);
-
-      currentOrderItems[index].qty = calculatedPcs;
-
-      const pcsInput = document.getElementById(`pcs-input-${index}`);
-      if (pcsInput) pcsInput.value = calculatedPcs;
-    }
-
-    function onPcsInputChange(index, value) {
-      const pcs = parseInt(value) || 0;
-      const pcsPerCarton = parseInt(currentOrderItems[index].pcs_per_carton || currentOrderItems[index].pcs_per_box) || 1;
-      currentOrderItems[index].qty = pcs;
-
-      const calculatedBoxes = parseFloat((pcs / pcsPerCarton).toFixed(2));
-      const boxInput = document.getElementById(`box-input-${index}`);
-      if (boxInput) boxInput.value = calculatedBoxes;
-    }
-
-    function adjustBoxes(index, change) {
+    function updateItemBoxes(index, change) {
       const item = currentOrderItems[index];
+      if (!item) return;
       const pcsPerCarton = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
       let currentBoxes = item.qty / pcsPerCarton;
-      
-      let newBoxes = Math.max(1, Math.round(currentBoxes) + change);
-      item.qty = newBoxes * pcsPerCarton;
+      currentBoxes = Math.max(0.5, currentBoxes + change);
+      item.qty = Math.round(currentBoxes * pcsPerCarton);
+      renderOrderItems();
+    }
 
+    function setItemBoxes(index, value) {
+      const item = currentOrderItems[index];
+      if (!item) return;
+      const pcsPerCarton = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
+      let boxes = parseFloat(value) || 1;
+      item.qty = Math.max(1, Math.round(boxes * pcsPerCarton));
+      renderOrderItems();
+    }
+
+    function setItemPcs(index, value) {
+      const item = currentOrderItems[index];
+      if (!item) return;
+      item.qty = Math.max(1, parseInt(value) || 1);
       renderOrderItems();
     }
 
@@ -825,52 +827,24 @@
     async function submitSupplyOrder() {
       if (currentOrderItems.length === 0) return alert('Please add at least one product.');
 
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
-
       const notes = document.getElementById('orderNotesInput').value.trim();
       const currentUser = (typeof getCurrentUser === 'function') ? getCurrentUser() : 'Manager';
 
-      const preparedItems = currentOrderItems.map(item => ({
-        id: item.id,
-        name_en: item.name_en || '',
-        name_ar: item.name_ar || '',
-        sku: item.sku || '',
-        image_url: item.image_url || '',
-        pcs_per_carton: parseInt(item.pcs_per_carton || item.pcs_per_box) || 1,
-        qty: parseInt(item.qty) || 1,
-        is_ordered: false,
-        received: false,
-        actual_received_qty: 0
-      }));
-
-      const { data, error } = await _supabase.from('procurement_orders').insert([{
-        items: preparedItems,
+      const payload = {
+        items: currentOrderItems,
         notes: notes,
         status: 'Pending',
-        created_by: currentUser?.name || currentUser || 'Manager'
-      }]);
+        created_by: currentUser
+      };
 
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
+      const { error } = await _supabase.from('procurement_orders').insert([payload]);
 
       if (error) {
-        alert('Failed to submit order: ' + error.message);
+        alert('Error creating order: ' + error.message);
       } else {
         closeModal('createOrderModal');
         await initProcurement();
       }
-    }
-
-    async function cancelOrder(orderId) {
-      if (!confirm(`Are you sure you want to cancel Order #${orderId}?`)) return;
-
-      const { error } = await _supabase.from('procurement_orders')
-        .update({ status: 'Cancelled' })
-        .eq('id', orderId);
-
-      if (!error) await initProcurement();
     }
 
     function exportOrderPDF(orderId) {
@@ -880,7 +854,7 @@
       document.getElementById('pdfOrderId').innerText = order.id;
       document.getElementById('pdfDate').innerText = order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A';
       document.getElementById('pdfStatus').innerText = order.status;
-      document.getElementById('pdfNotes').innerText = order.notes || 'None';
+      document.getElementById('pdfNotes').innerText = order.notes || 'N/A';
 
       const tbody = document.getElementById('pdfTableBody');
       tbody.innerHTML = (order.items || []).map(i => {
@@ -900,11 +874,11 @@
       element.style.display = 'block';
 
       const opt = {
-        margin:       0.5,
+        margin:       10,
         filename:     `Procurement_Order_${order.id}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
       html2pdf().set(opt).from(element).save().then(() => {
@@ -916,10 +890,12 @@
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order) return;
 
-      let csv = 'Box Capacity (Pcs/Box),Product Name,Qty Requested (Pcs),Qty Received (Pcs)\n';
+      let csv = 'Product Name,Box Capacity (Pcs/Box),Qty Ordered (Pcs),Qty Received (Pcs)\n';
       (order.items || []).forEach(i => {
         const pcsPerCarton = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
-        csv += `"${pcsPerCarton} Pcs/Box","${i.name_en || i.name_ar}",${i.qty},${i.actual_received_qty || (i.received ? i.qty : 0)}\n`;
+        const name = `"${(i.name_en || i.name_ar).replace(/"/g, '""')}"`;
+        const recv = i.actual_received_qty || (i.received ? i.qty : 0);
+        csv += `${name},${pcsPerCarton},${i.qty},${recv}\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -930,8 +906,6 @@
       link.click();
       document.body.removeChild(link);
     }
-
-    window.addEventListener('DOMContentLoaded', initProcurement);
   </script>
 </body>
 </html>
