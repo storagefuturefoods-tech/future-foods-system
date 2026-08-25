@@ -236,7 +236,6 @@ function openOrderPreview() {
 
   previewList.innerHTML = '';
 
-  // Render items (Photo, Name, Quantity in Pcs only)
   selectedIds.forEach(id => {
     const p = availableProducts.find(item => item.id == id);
     const qty = selectedQuantities[id];
@@ -256,7 +255,6 @@ function openOrderPreview() {
     `;
   });
 
-  // Render Notes
   const notes = (document.getElementById('orderNotes')?.value || '').trim();
   const notesBox = document.getElementById('previewNotesBox');
   const notesText = document.getElementById('previewNotesText');
@@ -278,7 +276,7 @@ function closePreviewAndReturn() {
 }
 
 // -------------------------------------------------------------
-// Confirm and Submit Order
+// Confirm and Submit Order (تخصم من المخزون فوراً)
 // -------------------------------------------------------------
 async function confirmAndSubmitOrder() {
   const selectedIds = Object.keys(selectedQuantities);
@@ -328,6 +326,20 @@ async function confirmAndSubmitOrder() {
   });
 
   await _supabase.from('order_items').insert(orderItems);
+
+  // خصم الكميات المحددة من جدول المنتجات في المخزون
+  for (const id of selectedIds) {
+    const prod = availableProducts.find(p => p.id == id);
+    const requestedQty = selectedQuantities[id];
+    if (prod) {
+      const newStock = Math.max(0, (prod.quantity || 0) - requestedQty);
+      await _supabase
+        .from('products')
+        .update({ quantity: newStock })
+        .eq('id', prod.id);
+    }
+  }
+
   await _supabase.from('order_logs').insert([{
     order_id: newOrder.id,
     status_change: 'Order Created (New)',
@@ -405,11 +417,70 @@ async function loadOrders() {
   });
 }
 
+// -------------------------------------------------------------
+// Update Order Status (تطوير عملية الإرجاع أو الخصم حسب الحالة)
+// -------------------------------------------------------------
 async function updateOrderStatus(orderId, newStatus) {
   if (!isAdminOrManager()) {
     alert("Sorry, you do not have permission to change order status!");
     loadOrders();
     return;
+  }
+
+  const currentOrder = ordersList.find(o => o.id === orderId);
+  const oldStatus = currentOrder ? currentOrder.status : '';
+
+  if (oldStatus === newStatus) return;
+
+  // جلب عناصر الطلب للتعديل
+  const { data: items, error: itemsErr } = await _supabase
+    .from('order_items')
+    .select('*')
+    .eq('order_id', orderId);
+
+  if (!itemsErr && items && items.length > 0) {
+    const isNowCancelled = newStatus === 'Cancelled' || newStatus === 'ملغي';
+    const wasCancelled = oldStatus === 'Cancelled' || oldStatus === 'ملغي';
+
+    // 1. عند تحويل الطلب إلى ملغي: إرجاع الكمية للمخزون
+    if (isNowCancelled && !wasCancelled) {
+      for (const item of items) {
+        if (item.product_sku) {
+          const { data: pData } = await _supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('sku', item.product_sku)
+            .single();
+
+          if (pData) {
+            await _supabase
+              .from('products')
+              .update({ quantity: (pData.quantity || 0) + item.quantity_pieces })
+              .eq('id', pData.id);
+          }
+        }
+      }
+    } 
+    // 2. عند تغيير الحالة من ملغي إلى حالة أخرى: اعادة خصم الكمية من المخزون
+    else if (!isNowCancelled && wasCancelled) {
+      for (const item of items) {
+        if (item.product_sku) {
+          const { data: pData } = await _supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('sku', item.product_sku)
+            .single();
+
+          if (pData) {
+            const newQty = Math.max(0, (pData.quantity || 0) - item.quantity_pieces);
+            await _supabase
+              .from('products')
+              .update({ quantity: newQty })
+              .eq('id', pData.id);
+          }
+        }
+      }
+    }
   }
 
   const empName = getEmployeeName();
@@ -419,6 +490,7 @@ async function updateOrderStatus(orderId, newStatus) {
     status_change: `Status changed to (${newStatus})`,
     action_by: empName
   }]);
+  
   loadOrders();
 }
 
