@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procurement & Supply Orders</title>
   <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -95,7 +95,7 @@
     .qty-picker {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
     .qty-btn {
       width: 28px;
@@ -108,7 +108,7 @@
       cursor: pointer;
     }
     .qty-input {
-      width: 60px;
+      width: 55px;
       height: 30px;
       text-align: center;
       background: var(--card-bg, #1e1e1e);
@@ -117,6 +117,17 @@
       border-radius: 4px;
       font-weight: bold;
       direction: ltr;
+    }
+    .unit-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .unit-label {
+      font-size: 0.65rem;
+      color: var(--text-muted, #aaa);
+      text-transform: uppercase;
     }
 
     .product-select-card {
@@ -166,17 +177,17 @@
 <body>
   <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
     <nav style="display: flex; align-items: center; gap: 12px;">
-    <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
-    <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
-    <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
-    <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-clipboard-list"></i></a>
-    <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-clipboard-list"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-gear"></i></a>
 
       <!-- Logout Icon -->
       <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
-</nav>
+    </nav>
     <div class="user-info">
       <span id="currentUserDisplay" style="font-weight: 600;"></span>
     </div>
@@ -279,10 +290,10 @@
       <thead>
         <tr>
           <th style="width: 12%;">Image</th>
-          <th style="width: 20%;">SKU</th>
+          <th style="width: 20%;">Box Pack</th>
           <th style="width: 38%;">Product Name</th>
-          <th style="width: 15%;">Qty Ordered</th>
-          <th style="width: 15%;">Qty Received</th>
+          <th style="width: 15%;">Qty Ordered (Pcs)</th>
+          <th style="width: 15%;">Qty Received (Pcs)</th>
         </tr>
       </thead>
       <tbody id="pdfTableBody"></tbody>
@@ -345,19 +356,19 @@
         const formattedDate = order.created_at ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
         const items = order.items || [];
 
-        // Check conditions for headers controls
         const hasUnorderedItems = items.some(i => !i.is_ordered && !i.received);
         const hasReceivableItems = items.some(i => i.is_ordered && !i.received);
 
         let itemsRowsHtml = items.map((i, idx) => {
           const isOrdered = i.is_ordered === true;
           const isReceived = i.received === true;
+          const pcsPerCarton = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
+          const boxesCount = (i.qty / pcsPerCarton).toFixed(1).replace(/\.0$/, '');
 
           return `
             <div class="item-row" style="${isReceived ? 'opacity:0.75; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
               
               <div style="display:flex; align-items:center; gap:12px;">
-                <!-- Selection Checkboxes -->
                 ${(!isOrdered && !isReceived && order.status !== 'Cancelled') ? `
                   <input type="checkbox" class="order-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Ordering">
                 ` : ''}
@@ -370,20 +381,18 @@
                 <div>
                   <strong style="font-size:0.9rem; color:var(--text-color);">${i.name_en || i.name_ar}</strong>
                   <div style="font-size:0.75rem; color:var(--text-muted);">
-                    SKU: ${i.sku || 'N/A'} | Pcs/Carton: <strong>${i.pcs_per_carton || 1}</strong>
+                    Box Capacity: <strong>${pcsPerCarton} Pcs/Box</strong>
                   </div>
                 </div>
               </div>
 
               <div style="display:flex; align-items:center; gap:15px;">
                 
-                <!-- Qty Requested -->
                 <div style="text-align:right;">
-                  <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color); font-size:1rem;">${i.qty}</strong></div>
-                  ${isReceived ? `<div style="font-size:0.8rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || i.qty}</div>` : ''}
+                  <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color); font-size:1rem;">${boxesCount} Boxes (${i.qty} Pcs)</strong></div>
+                  ${isReceived ? `<div style="font-size:0.8rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || i.qty} Pcs</div>` : ''}
                 </div>
 
-                <!-- Action Controls -->
                 <div style="display:flex; align-items:center; gap:10px;">
                   ${order.status === 'Cancelled' ? '' : (
                     isReceived ? `
@@ -394,9 +403,8 @@
                           <i class="fa-solid fa-paper-plane"></i> Order Item
                         </button>
                       ` : `
-                        <!-- Warehouse Receiving Controls -->
                         <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
-                          <span style="font-size:0.75rem; color:#aaa;">Recv Qty:</span>
+                          <span style="font-size:0.75rem; color:#aaa;">Recv Qty (Pcs):</span>
                           <input type="number" id="recv-qty-${order.id}-${idx}" value="${i.qty}" min="0" class="qty-input">
                           <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
                             <i class="fa-solid fa-boxes-packing"></i> Receive & Stock
@@ -406,7 +414,6 @@
                     )
                   )}
 
-                  <!-- Delete Single Item Button -->
                   ${(!isReceived && order.status !== 'Cancelled') ? `
                     <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:4px 8px; font-size:0.75rem;" title="Remove this item from order" onclick="removeSingleItemFromOrder(${order.id}, ${idx})">
                       <i class="fa-solid fa-trash"></i>
@@ -439,7 +446,6 @@
 
             <div class="order-body" id="body-${order.id}">
               
-              <!-- Procurement Manager Bulk Action -->
               ${hasUnorderedItems && order.status !== 'Cancelled' ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59, 130, 246, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(59, 130, 246, 0.3);">
                   <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
@@ -451,7 +457,6 @@
                 </div>
               ` : ''}
 
-              <!-- Warehouse Manager Bulk Action -->
               ${hasReceivableItems && order.status !== 'Cancelled' ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16, 185, 129, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(16, 185, 129, 0.3);">
                   <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
@@ -496,7 +501,6 @@
       document.querySelectorAll(`.recv-chk-${orderId}`).forEach(chk => chk.checked = isChecked);
     }
 
-    // Phase 1: Procurement Manager marks item as ordered
     async function markSingleItemOrdered(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -534,7 +538,6 @@
       if (!error) await initProcurement();
     }
 
-    // Phase 2: Warehouse Manager receives items into stock
     async function markSingleItemReceived(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -545,7 +548,6 @@
       order.items[itemIndex].received = true;
       order.items[itemIndex].actual_received_qty = actualQty;
 
-      // Update Inventory Stock
       const itemData = order.items[itemIndex];
       const prod = allProducts.find(p => p.id == itemData.id);
       if (prod) {
@@ -580,7 +582,6 @@
           item.received = true;
           item.actual_received_qty = actualQty;
 
-          // Update product stock
           const prod = allProducts.find(p => p.id == item.id);
           if (prod) {
             const newQty = prod.quantity + actualQty;
@@ -599,7 +600,6 @@
       if (!error) await initProcurement();
     }
 
-    // Delete single item from order
     async function removeSingleItemFromOrder(orderId, itemIndex) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order || !order.items[itemIndex]) return;
@@ -609,7 +609,6 @@
       order.items.splice(itemIndex, 1);
 
       if (order.items.length === 0) {
-        // If no items remain, cancel or delete the whole order
         await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
       } else {
         const allReceived = order.items.every(i => i.received === true);
@@ -685,6 +684,7 @@
       filtered.forEach(p => {
         const inPendingOrder = isProductInPendingOrders(p.id);
         const alreadyInList = currentOrderItems.some(item => item.id == p.id);
+        const pcsPerCarton = parseInt(p.pcs_per_carton || p.pcs_per_box) || 1;
 
         container.innerHTML += `
           <div class="product-select-card ${alreadyInList ? 'added' : ''} ${inPendingOrder ? 'disabled' : ''}" 
@@ -694,7 +694,7 @@
               <div>
                 <strong style="font-size:0.88rem; color:var(--text-color);">${p.name_en || p.name_ar}</strong>
                 <div style="font-size:0.75rem; color:var(--text-muted);">
-                  SKU: ${p.sku || 'N/A'} | Stock: <strong style="color:${p.quantity <= 5 ? '#ef4444' : '#10b981'}">${p.quantity}</strong>
+                  Box Capacity: <strong>${pcsPerCarton} Pcs/Box</strong> | Stock: <strong style="color:${p.quantity <= 5 ? '#ef4444' : '#10b981'}">${p.quantity}</strong>
                 </div>
               </div>
             </div>
@@ -714,113 +714,162 @@
         currentOrderItems.splice(idx, 1);
       } else {
         const prod = allProducts.find(p => p.id == productId);
-        if (prod) currentOrderItems.push({ ...prod, qty: 1 });
+        if (prod) currentOrderItems.push({ ...prod, qty: parseInt(prod.pcs_per_carton || prod.pcs_per_box) || 1 });
       }
-      renderOrderItems();
       renderCatalogProducts();
+      renderOrderItems();
     }
 
+    // --- RENDER ORDER ITEMS WITH DUAL BOX / PCS INPUTS ---
     function renderOrderItems() {
       const container = document.getElementById('orderItemsContainer');
       container.innerHTML = '';
 
       if (currentOrderItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:30px; color:var(--text-muted);">No products added yet.</p>';
+        container.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding:20px;">No items selected yet. Click "Add Product from Catalog" to add items.</p>';
         return;
       }
 
-      currentOrderItems.forEach((item, idx) => {
+      currentOrderItems.forEach((item, index) => {
+        const pcsPerCarton = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
+        const boxesVal = parseFloat((item.qty / pcsPerCarton).toFixed(2));
+
         container.innerHTML += `
           <div class="item-row">
             <div style="display:flex; align-items:center; gap:12px;">
-              <img src="${item.image_url || 'https://via.placeholder.com/44'}">
+              <img src="${item.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
               <div>
-                <strong style="font-size:0.88rem;">${item.name_en || item.name_ar}</strong>
+                <strong style="font-size:0.9rem; color:var(--text-color);">${item.name_en || item.name_ar}</strong>
                 <div style="font-size:0.75rem; color:var(--text-muted);">
-                  SKU: ${item.sku || 'N/A'} | Current Stock: <strong>${item.quantity}</strong>
+                  Box Capacity: <strong>${pcsPerCarton} Pcs/Box</strong> | Stock: ${item.quantity || 0}
                 </div>
               </div>
             </div>
 
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              
+              <!-- DUAL QUANTITY PICKER (BOXES <-> PCS) -->
               <div class="qty-picker">
-                <button class="qty-btn" onclick="changeQty(${idx}, -1)">-</button>
-                <input type="number" class="qty-input" value="${item.qty}" onchange="setQty(${idx}, this.value)">
-                <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+                
+                <!-- Minus Button (Decrements Boxes) -->
+                <button class="qty-btn" onclick="adjustBoxes(${index}, -1)">-</button>
+
+                <!-- Box Input -->
+                <div class="unit-group">
+                  <input type="number" id="box-input-${index}" class="qty-input" value="${boxesVal}" min="0.1" step="any" oninput="onBoxInputChange(${index}, this.value)">
+                  <span class="unit-label">Boxes</span>
+                </div>
+
+                <span style="font-weight:bold; color:var(--text-muted); font-size:0.8rem;">=</span>
+
+                <!-- Pcs Input -->
+                <div class="unit-group">
+                  <input type="number" id="pcs-input-${index}" class="qty-input" value="${item.qty}" min="1" step="1" oninput="onPcsInputChange(${index}, this.value)">
+                  <span class="unit-label">Pcs</span>
+                </div>
+
+                <!-- Plus Button (Increments Boxes) -->
+                <button class="qty-btn" onclick="adjustBoxes(${index}, 1)">+</button>
+
               </div>
-              <button onclick="removeItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+
+              <!-- Delete Item Button -->
+              <button class="btn" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid #ef4444; padding:5px 8px;" onclick="removeOrderItem(${index})">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+
             </div>
           </div>
         `;
       });
     }
 
-    function changeQty(idx, change) {
-      if (!currentOrderItems[idx]) return;
-      currentOrderItems[idx].qty += change;
-      if (currentOrderItems[idx].qty < 1) currentOrderItems[idx].qty = 1;
+    // Handlers for Dual Input Synchronization
+    function onBoxInputChange(index, value) {
+      const boxes = parseFloat(value) || 0;
+      const pcsPerCarton = parseInt(currentOrderItems[index].pcs_per_carton || currentOrderItems[index].pcs_per_box) || 1;
+      const calculatedPcs = Math.round(boxes * pcsPerCarton);
+
+      currentOrderItems[index].qty = calculatedPcs;
+
+      const pcsInput = document.getElementById(`pcs-input-${index}`);
+      if (pcsInput) pcsInput.value = calculatedPcs;
+    }
+
+    function onPcsInputChange(index, value) {
+      const pcs = parseInt(value) || 0;
+      const pcsPerCarton = parseInt(currentOrderItems[index].pcs_per_carton || currentOrderItems[index].pcs_per_box) || 1;
+      currentOrderItems[index].qty = pcs;
+
+      const calculatedBoxes = parseFloat((pcs / pcsPerCarton).toFixed(2));
+      const boxInput = document.getElementById(`box-input-${index}`);
+      if (boxInput) boxInput.value = calculatedBoxes;
+    }
+
+    function adjustBoxes(index, change) {
+      const item = currentOrderItems[index];
+      const pcsPerCarton = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
+      let currentBoxes = item.qty / pcsPerCarton;
+      
+      let newBoxes = Math.max(1, Math.round(currentBoxes) + change);
+      item.qty = newBoxes * pcsPerCarton;
+
       renderOrderItems();
     }
 
-    function setQty(idx, val) {
-      let q = parseInt(val) || 1;
-      if (q < 1) q = 1;
-      currentOrderItems[idx].qty = q;
+    function removeOrderItem(index) {
+      currentOrderItems.splice(index, 1);
       renderOrderItems();
-    }
-
-    function removeItem(idx) {
-      currentOrderItems.splice(idx, 1);
-      renderOrderItems();
-      renderCatalogProducts();
     }
 
     async function submitSupplyOrder() {
-      if (currentOrderItems.length === 0) return alert('Please add at least one item.');
+      if (currentOrderItems.length === 0) return alert('Please add at least one product.');
 
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
-      submitBtn.innerText = 'Submitting...';
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
 
-      try {
-        const currentUser = JSON.parse(localStorage.getItem('app_user') || '{}');
-        const notes = document.getElementById('orderNotesInput').value.trim();
+      const notes = document.getElementById('orderNotesInput').value.trim();
+      const currentUser = (typeof getCurrentUser === 'function') ? getCurrentUser() : 'Manager';
 
-        const preparedItems = currentOrderItems.map(i => ({
-          id: i.id,
-          sku: i.sku || 'N/A',
-          name_en: i.name_en || i.name_ar || 'Product',
-          image_url: i.image_url || '',
-          pcs_per_carton: i.pcs_per_carton || i.items_per_box || 1,
-          qty: i.qty,
-          is_ordered: false,
-          received: false
-        }));
+      const preparedItems = currentOrderItems.map(item => ({
+        id: item.id,
+        name_en: item.name_en || '',
+        name_ar: item.name_ar || '',
+        sku: item.sku || '',
+        image_url: item.image_url || '',
+        pcs_per_carton: parseInt(item.pcs_per_carton || item.pcs_per_box) || 1,
+        qty: parseInt(item.qty) || 1,
+        is_ordered: false,
+        received: false,
+        actual_received_qty: 0
+      }));
 
-        const payload = {
-          items: preparedItems,
-          notes: notes,
-          status: 'Pending',
-          created_by: currentUser.name || currentUser.email || 'Manager',
-          created_at: new Date().toISOString()
-        };
+      const { data, error } = await _supabase.from('procurement_orders').insert([{
+        items: preparedItems,
+        notes: notes,
+        status: 'Pending',
+        created_by: currentUser?.name || currentUser || 'Manager'
+      }]);
 
-        const { error } = await _supabase.from('procurement_orders').insert([payload]);
-        if (error) throw error;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
 
+      if (error) {
+        alert('Failed to submit order: ' + error.message);
+      } else {
         closeModal('createOrderModal');
-        await fetchOrders();
-      } catch (err) {
-        alert('Error submitting order: ' + (err.message || 'Network connection error'));
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
+        await initProcurement();
       }
     }
 
     async function cancelOrder(orderId) {
-      if (!confirm('Are you sure you want to cancel this supply order?')) return;
-      const { error } = await _supabase.from('procurement_orders').update({ status: 'Cancelled' }).eq('id', orderId);
+      if (!confirm(`Are you sure you want to cancel Order #${orderId}?`)) return;
+
+      const { error } = await _supabase.from('procurement_orders')
+        .update({ status: 'Cancelled' })
+        .eq('id', orderId);
+
       if (!error) await initProcurement();
     }
 
@@ -831,56 +880,59 @@
       document.getElementById('pdfOrderId').innerText = order.id;
       document.getElementById('pdfDate').innerText = order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A';
       document.getElementById('pdfStatus').innerText = order.status;
-      document.getElementById('pdfNotes').innerText = order.notes || 'N/A';
+      document.getElementById('pdfNotes').innerText = order.notes || 'None';
 
-      const body = document.getElementById('pdfTableBody');
-      body.innerHTML = '';
-      order.items.forEach(i => {
-        body.innerHTML += `
+      const tbody = document.getElementById('pdfTableBody');
+      tbody.innerHTML = (order.items || []).map(i => {
+        const pcsPerCarton = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
+        return `
           <tr>
-            <td style="text-align: center;"><img src="${i.image_url || 'https://via.placeholder.com/40'}" crossorigin="anonymous"></td>
-            <td><strong>${i.sku || 'N/A'}</strong></td>
+            <td><img src="${i.image_url || 'https://via.placeholder.com/40'}"></td>
+            <td>${pcsPerCarton} Pcs/Box</td>
             <td>${i.name_en || i.name_ar}</td>
-            <td style="font-weight: bold; text-align: center; font-size: 14px;">${i.qty}</td>
-            <td style="font-weight: bold; text-align: center; font-size: 14px; color: #10b981;">${i.actual_received_qty || (i.received ? i.qty : 0)}</td>
+            <td>${i.qty}</td>
+            <td>${i.actual_received_qty || (i.received ? i.qty : 0)}</td>
           </tr>
         `;
-      });
+      }).join('');
 
       const element = document.getElementById('pdfRenderArea');
       element.style.display = 'block';
 
-      html2pdf().set({
-        margin: [10, 10, 10, 10],
-        filename: `Procurement_Order_${order.id}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(element).save().then(() => element.style.display = 'none');
+      const opt = {
+        margin:       0.5,
+        filename:     `Procurement_Order_${order.id}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        element.style.display = 'none';
+      });
     }
 
     function exportOrderExcel(orderId) {
       const order = allOrdersList.find(o => o.id === orderId);
       if (!order) return;
 
-      let csvContent = "data:text/csv;charset=utf-8,SKU,Product Name,Qty Requested,Qty Received,Ordered Status,Received Status\n";
-      order.items.forEach(i => {
-        csvContent += `"${i.sku || 'N/A'}","${i.name_en || i.name_ar}",${i.qty},${i.actual_received_qty || 0},"${i.is_ordered ? 'Ordered' : 'Pending'}","${i.received ? 'Received' : 'Pending'}"\n`;
+      let csv = 'Box Capacity (Pcs/Box),Product Name,Qty Requested (Pcs),Qty Received (Pcs)\n';
+      (order.items || []).forEach(i => {
+        const pcsPerCarton = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
+        csv += `"${pcsPerCarton} Pcs/Box","${i.name_en || i.name_ar}",${i.qty},${i.actual_received_qty || (i.received ? i.qty : 0)}\n`;
       });
 
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Procurement_Order_${order.id}.csv`);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `Procurement_Order_${order.id}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
 
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-    document.addEventListener('DOMContentLoaded', initProcurement);
+    // Auto-init on page load
+    window.addEventListener('DOMContentLoaded', initProcurement);
   </script>
 </body>
 </html>
