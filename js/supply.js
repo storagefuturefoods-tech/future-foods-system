@@ -100,7 +100,7 @@ function populateCategoriesDropdown(products) {
   });
 }
 
-// Render Products Grid مع دعم التحكم بالكراتين والحبات والكسور
+// Render Products Grid مع أزرار + و - للكراتين والحبات
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
@@ -121,36 +121,41 @@ function renderProductsGrid(prods) {
     const isSelected = currentQtyPcs > 0;
 
     grid.innerHTML += `
-      <div class="product-card ${isSelected ? 'selected' : ''}" id="pcard-${p.id}" style="padding: 8px; border: 1px solid var(--border-color, #444); border-radius: 6px; text-align: center; background: var(--card-bg, #1e1e1e);">
+      <div class="product-card ${isSelected ? 'selected' : ''}" id="pcard-${p.id}" style="padding: 6px; border: 1px solid var(--border-color, #444); border-radius: 6px; text-align: center; background: var(--card-bg, #1e1e1e);">
         <img 
           src="${imgUrl}" 
           alt="${name}" 
-          style="width: 100%; height: 75px; object-fit: cover; border-radius: 4px; cursor: pointer;"
+          style="width: 100%; height: 70px; object-fit: cover; border-radius: 4px; cursor: pointer;"
           onclick="previewImage('${imgUrl}', '${name}')"
           onerror="this.src='https://via.placeholder.com/100'"
         >
         <h6 style="margin: 4px 0 2px 0; color: var(--text-color); font-size: 0.72rem; line-height: 1.1; font-weight: 600; height: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${name}">${name}</h6>
         
-        <div style="font-size: 0.62rem; color: var(--text-muted); margin: 2px 0;">
+        <div style="font-size: 0.6rem; color: var(--text-muted); margin: 2px 0;">
           Stock: <strong style="color:${isOutOfStock ? '#e53e3e' : 'inherit'}">${p.quantity}</strong> | Box: <strong>${boxCap} Pcs</strong>
         </div>
 
         ${isOutOfStock ? `
           <div style="font-size: 0.65rem; color: #e53e3e; font-weight: bold; margin-top: 6px;">Out of Stock</div>
         ` : `
-          <div class="qty-control-box" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-            <!-- التحكم بالكراتين -->
-            <div style="display:flex; align-items:center; justify-content:center; gap:2px;">
-              <span style="font-size:0.6rem; color:var(--text-muted); width:32px;">Box:</span>
-              <button class="qty-btn" style="padding:1px 6px;" onclick="updateItemBoxes(${p.id}, -1)">-</button>
-              <input type="number" class="qty-input" id="boxinput-${p.id}" value="${currentBoxes}" min="0" step="any" style="width:45px; text-align:center; font-size:0.75rem;" onchange="manualSetBoxes(${p.id}, this.value)">
-              <button class="qty-btn" style="padding:1px 6px;" onclick="updateItemBoxes(${p.id}, 1)">+</button>
+          <div class="qty-control-box" style="display:flex; flex-direction:column; gap:3px; margin-top:4px;">
+            
+            <!-- تحكم الكراتين (+ / - / input) -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:2px;">
+              <button class="qty-btn" style="padding:1px 5px; font-size:0.75rem; background:#2e7d32; color:#fff; border:none; border-radius:3px; cursor:pointer;" onclick="updateItemBoxes(${p.id}, 1)">+</button>
+              <input type="number" class="qty-input" id="boxinput-${p.id}" value="${currentBoxes === 0 ? '' : currentBoxes}" placeholder="0" min="0" step="any" style="width:100%; text-align:center; font-size:0.72rem; padding:2px; background:var(--input-bg, #2a2a2a); color:var(--text-color, #fff); border:1px solid var(--border-color, #444); border-radius:3px;" onchange="manualSetBoxes(${p.id}, this.value)">
+              <button class="qty-btn" style="padding:1px 6px; font-size:0.75rem; background:#c62828; color:#fff; border:none; border-radius:3px; cursor:pointer;" onclick="updateItemBoxes(${p.id}, -1)">-</button>
+              <span style="font-size:0.58rem; color:var(--text-muted); width:22px; text-align:right;">Box</span>
             </div>
-            <!-- إدخال الحبات المباشر -->
-            <div style="display:flex; align-items:center; justify-content:center; gap:2px;">
-              <span style="font-size:0.6rem; color:var(--text-muted); width:32px;">Pcs:</span>
-              <input type="number" class="qty-input" id="pinput-${p.id}" value="${currentQtyPcs}" min="0" max="${p.quantity}" step="any" style="width:75px; text-align:center; font-size:0.75rem;" onchange="manualSetQty(${p.id}, this.value)">
+
+            <!-- تحكم الحبات (+ / - / input) -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:2px;">
+              <button class="qty-btn" style="padding:1px 5px; font-size:0.75rem; background:#2e7d32; color:#fff; border:none; border-radius:3px; cursor:pointer;" onclick="updateItemQty(${p.id}, 1)">+</button>
+              <input type="number" class="qty-input" id="pinput-${p.id}" value="${currentQtyPcs === 0 ? '' : currentQtyPcs}" placeholder="0" min="0" max="${p.quantity}" step="any" style="width:100%; text-align:center; font-size:0.72rem; padding:2px; background:var(--input-bg, #2a2a2a); color:var(--text-color, #fff); border:1px solid var(--border-color, #444); border-radius:3px;" onchange="manualSetQty(${p.id}, this.value)">
+              <button class="qty-btn" style="padding:1px 6px; font-size:0.75rem; background:#c62828; color:#fff; border:none; border-radius:3px; cursor:pointer;" onclick="updateItemQty(${p.id}, -1)">-</button>
+              <span style="font-size:0.58rem; color:var(--text-muted); width:22px; text-align:right;">Pcs</span>
             </div>
+
           </div>
         `}
       </div>
@@ -176,7 +181,24 @@ function filterProducts() {
   renderProductsGrid(filtered);
 }
 
-// تعديل بالكراتين (+1 كرتون / -1 كرتون)
+// زيادة ونقص الحبات (+ / -)
+function updateItemQty(prodId, change) {
+  const prod = availableProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  let currentPcs = selectedQuantities[prodId] || 0;
+  let newPcs = currentPcs + change;
+
+  if (newPcs < 0) newPcs = 0;
+  if (newPcs > prod.quantity) {
+    alert(`Max available stock is ${prod.quantity} Pcs`);
+    newPcs = prod.quantity;
+  }
+
+  applyQtyUpdate(prodId, newPcs);
+}
+
+// زيادة ونقص الكراتين (+ / -)
 function updateItemBoxes(prodId, change) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
@@ -197,7 +219,7 @@ function updateItemBoxes(prodId, change) {
   applyQtyUpdate(prodId, newPcs);
 }
 
-// إدخال الكراتين يدوياً (يدعم الكسور مثل 0.8)
+// إدخال الكراتين يدوياً
 function manualSetBoxes(prodId, value) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
@@ -223,7 +245,7 @@ function manualSetQty(prodId, value) {
   let val = parseFloat(value) || 0;
   if (val < 0) val = 0;
   if (val > prod.quantity) {
-    alert(`Max available stock is ${prod.quantity}`);
+    alert(`Max available stock is ${prod.quantity} Pcs`);
     val = prod.quantity;
   }
 
@@ -244,10 +266,13 @@ function applyQtyUpdate(prodId, pcsQty) {
   }
 
   const pcsInput = document.getElementById(`pinput-${prodId}`);
-  if (pcsInput) pcsInput.value = pcsQty;
+  if (pcsInput) pcsInput.value = pcsQty === 0 ? '' : pcsQty;
 
   const boxInput = document.getElementById(`boxinput-${prodId}`);
-  if (boxInput) boxInput.value = Number((pcsQty / boxCap).toFixed(2));
+  if (boxInput) {
+    const boxesVal = Number((pcsQty / boxCap).toFixed(2));
+    boxInput.value = boxesVal === 0 ? '' : boxesVal;
+  }
 
   const cardEl = document.getElementById(`pcard-${prodId}`);
   if (cardEl) {
