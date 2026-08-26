@@ -14,6 +14,13 @@ let currentOrderItems = [];
 let allOrdersList = [];
 let activeTabFilter = 'All';
 
+// دالة مساعدة للحصول على سعة الكرتون من العمود الصحيح في قاعدة البيانات
+function getBoxCapacity(product) {
+  if (!product) return 1;
+  const val = parseInt(product.items_per_box || product.pcs_per_carton || product.pcs_per_box, 10);
+  return isNaN(val) || val < 1 ? 1 : val;
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   initProcurement();
 });
@@ -24,12 +31,14 @@ async function initProcurement() {
 }
 
 async function fetchProducts() {
-  const { data } = await _supabase.from('products').select('*').eq('is_disabled', false);
-  if (data) allProducts = data;
+  const { data, error } = await _supabase.from('products').select('*').eq('is_disabled', false);
+  if (data) {
+    allProducts = data;
+  }
 }
 
 async function fetchOrders() {
-  const { data } = await _supabase.from('procurement_orders').select('*').order('id', { ascending: false });
+  const { data, error } = await _supabase.from('procurement_orders').select('*').order('id', { ascending: false });
   if (data) {
     allOrdersList = data;
     renderOrdersList();
@@ -72,7 +81,7 @@ function renderOrdersList() {
     let itemsRowsHtml = items.map((i, idx) => {
       const isOrdered = i.is_ordered === true;
       const isReceived = i.received === true;
-      const pcsPerCarton = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
+      const pcsPerCarton = getBoxCapacity(i);
       
       const boxesCount = i.boxes_qty || Math.ceil(i.qty / pcsPerCarton) || 1;
       const totalPcs = i.qty || (boxesCount * pcsPerCarton);
@@ -99,7 +108,6 @@ function renderOrdersList() {
           </div>
 
           <div style="display:flex; align-items:center; gap:15px;">
-            
             <div style="text-align:right;">
               <div style="font-size:0.85rem; color:var(--text-muted);">Requested: <strong style="color:var(--text-color); font-size:1rem;">${boxesCount} Boxes (${totalPcs} Pcs)</strong></div>
               ${isReceived ? `<div style="font-size:0.8rem; color:#10b981; font-weight:bold;">Received: ${i.actual_received_qty || totalPcs} Pcs</div>` : ''}
@@ -132,7 +140,6 @@ function renderOrdersList() {
                 </button>
               ` : ''}
             </div>
-
           </div>
         </div>
       `;
@@ -198,7 +205,7 @@ function renderOrderItems() {
   }
 
   currentOrderItems.forEach((item, index) => {
-    const pcsPerBox = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
+    const pcsPerBox = getBoxCapacity(item);
     const boxesCount = item.boxes_qty || 1;
     const totalPcs = boxesCount * pcsPerBox;
 
@@ -208,7 +215,7 @@ function renderOrderItems() {
           <img src="${item.image_url || 'https://via.placeholder.com/44'}" onerror="this.src='https://via.placeholder.com/44'">
           <div>
             <strong style="font-size:0.88rem; color:var(--text-color);">${item.name_en || item.name_ar}</strong>
-            <div style="font-size:0.75rem; color:var(--text-muted);">Box Capacity: ${pcsPerBox} Pcs/Box</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Box Capacity: <strong>${pcsPerBox} Pcs/Box</strong></div>
           </div>
         </div>
 
@@ -247,7 +254,7 @@ function updateItemBoxes(index, change) {
 }
 
 function setItemBoxesDirect(index, value) {
-  let val = parseInt(value) || 1;
+  let val = parseInt(value, 10) || 1;
   if (val < 1) val = 1;
   if (currentOrderItems[index]) {
     currentOrderItems[index].boxes_qty = val;
@@ -310,7 +317,7 @@ function renderCatalogProducts() {
   filtered.forEach(p => {
     const inPendingOrder = isProductInPendingOrders(p.id);
     const alreadyInList = currentOrderItems.some(item => item.id == p.id);
-    const pcsPerCarton = parseInt(p.pcs_per_carton || p.pcs_per_box) || 1;
+    const pcsPerCarton = getBoxCapacity(p);
 
     container.innerHTML += `
       <div class="product-select-card ${alreadyInList ? 'added' : ''} ${inPendingOrder ? 'disabled' : ''}" 
@@ -333,7 +340,7 @@ function renderCatalogProducts() {
 }
 
 function autoAddLowStockItems() {
-  const lowStockList = allProducts.filter(p => p.quantity <= (p.min_limit || p.min_stock || 5));
+  const lowStockList = allProducts.filter(p => p.quantity <= (p.min_quantity || p.min_limit || 5));
   let addedCount = 0;
 
   lowStockList.forEach(p => {
@@ -365,7 +372,7 @@ async function submitSupplyOrder() {
 
   const notes = document.getElementById('orderNotesInput').value.trim();
   const formattedItems = currentOrderItems.map(item => {
-    const pcsPerBox = parseInt(item.pcs_per_carton || item.pcs_per_box) || 1;
+    const pcsPerBox = getBoxCapacity(item);
     const boxesQty = item.boxes_qty || 1;
     const totalPcs = boxesQty * pcsPerBox;
 
@@ -374,7 +381,7 @@ async function submitSupplyOrder() {
       name_en: item.name_en,
       name_ar: item.name_ar,
       image_url: item.image_url,
-      pcs_per_carton: pcsPerBox,
+      items_per_box: pcsPerBox,
       boxes_qty: boxesQty,
       qty: totalPcs,
       is_ordered: false,
@@ -450,7 +457,7 @@ async function bulkMarkOrdered(orderId) {
   if (checkedBoxes.length === 0) return alert('Please select at least one item to mark as ordered.');
 
   checkedBoxes.forEach(chk => {
-    const idx = parseInt(chk.value);
+    const idx = parseInt(chk.value, 10);
     if (order.items[idx]) {
       order.items[idx].is_ordered = true;
     }
@@ -470,7 +477,7 @@ async function markSingleItemReceived(orderId, itemIndex) {
   if (!order || !order.items[itemIndex]) return;
 
   const inputEl = document.getElementById(`recv-qty-${orderId}-${itemIndex}`);
-  const actualQty = inputEl ? (parseInt(inputEl.value) || 0) : order.items[itemIndex].qty;
+  const actualQty = inputEl ? (parseInt(inputEl.value, 10) || 0) : order.items[itemIndex].qty;
 
   order.items[itemIndex].received = true;
   order.items[itemIndex].actual_received_qty = actualQty;
@@ -500,11 +507,11 @@ async function bulkMarkReceived(orderId) {
   if (checkedBoxes.length === 0) return alert('Please select at least one item to receive into stock.');
 
   for (let chk of checkedBoxes) {
-    const idx = parseInt(chk.value);
+    const idx = parseInt(chk.value, 10);
     const item = order.items[idx];
     if (item && !item.received) {
       const inputEl = document.getElementById(`recv-qty-${orderId}-${idx}`);
-      const actualQty = inputEl ? (parseInt(inputEl.value) || 0) : item.qty;
+      const actualQty = inputEl ? (parseInt(inputEl.value, 10) || 0) : item.qty;
 
       item.received = true;
       item.actual_received_qty = actualQty;
@@ -567,7 +574,7 @@ function exportOrderPDF(orderId) {
 
   const tbody = document.getElementById('pdfTableBody');
   tbody.innerHTML = (order.items || []).map(i => {
-    const pcsPerBox = parseInt(i.pcs_per_carton || i.pcs_per_box) || 1;
+    const pcsPerBox = getBoxCapacity(i);
     const boxes = i.boxes_qty || Math.ceil(i.qty / pcsPerBox) || 1;
     const totalPcs = i.qty || (boxes * pcsPerBox);
 
