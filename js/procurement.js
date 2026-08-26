@@ -207,7 +207,7 @@ function renderOrderItems() {
   currentOrderItems.forEach((item, index) => {
     const pcsPerBox = getBoxCapacity(item);
     const boxesCount = item.boxes_qty || 1;
-    const totalPcs = boxesCount * pcsPerBox;
+    const totalPcs = item.custom_total_pcs !== undefined ? item.custom_total_pcs : (boxesCount * pcsPerBox);
 
     container.innerHTML += `
       <div class="item-row">
@@ -231,7 +231,7 @@ function renderOrderItems() {
 
           <div class="unit-group">
             <span class="unit-label">Total Pcs</span>
-            <input type="number" class="qty-input qty-readonly" value="${totalPcs}" readonly>
+            <input type="number" class="qty-input" value="${totalPcs}" min="1" onchange="setItemTotalPcsDirect(${index}, this.value)">
           </div>
 
           <button class="btn" style="background:none; color:#ef4444; border:none; font-size:1.1rem; cursor:pointer;" onclick="removeProductFromOrder(${index})">
@@ -248,7 +248,10 @@ function updateItemBoxes(index, change) {
     let current = currentOrderItems[index].boxes_qty || 1;
     let newQty = current + change;
     if (newQty < 1) newQty = 1;
+
+    const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
     currentOrderItems[index].boxes_qty = newQty;
+    currentOrderItems[index].custom_total_pcs = newQty * pcsPerBox;
     renderOrderItems();
   }
 }
@@ -257,7 +260,24 @@ function setItemBoxesDirect(index, value) {
   let val = parseInt(value, 10) || 1;
   if (val < 1) val = 1;
   if (currentOrderItems[index]) {
+    const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
     currentOrderItems[index].boxes_qty = val;
+    currentOrderItems[index].custom_total_pcs = val * pcsPerBox;
+    renderOrderItems();
+  }
+}
+
+function setItemTotalPcsDirect(index, value) {
+  let pcs = parseInt(value, 10) || 1;
+  if (pcs < 1) pcs = 1;
+
+  if (currentOrderItems[index]) {
+    const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
+    const calculatedBoxes = Math.ceil(pcs / pcsPerBox);
+
+    currentOrderItems[index].custom_total_pcs = pcs;
+    currentOrderItems[index].boxes_qty = calculatedBoxes < 1 ? 1 : calculatedBoxes;
+    
     renderOrderItems();
   }
 }
@@ -374,7 +394,7 @@ async function submitSupplyOrder() {
   const formattedItems = currentOrderItems.map(item => {
     const pcsPerBox = getBoxCapacity(item);
     const boxesQty = item.boxes_qty || 1;
-    const totalPcs = boxesQty * pcsPerBox;
+    const totalPcs = item.custom_total_pcs !== undefined ? item.custom_total_pcs : (boxesQty * pcsPerBox);
 
     return {
       id: item.id,
