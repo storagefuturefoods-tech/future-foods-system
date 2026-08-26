@@ -1,5 +1,5 @@
 let availableProducts = [];
-let selectedQuantities = {}; // { productId: qty }
+let selectedQuantities = {}; // { productId: qty_in_pcs }
 let ordersList = [];
 
 // Get current user
@@ -9,6 +9,13 @@ function getCurrentUser() {
   } catch (e) {
     return {};
   }
+}
+
+// Helper to safely fetch box capacity
+function getBoxCapacity(product) {
+  if (!product) return 1;
+  const val = parseFloat(product.items_per_box || product.pcs_per_box || product.pcs_per_carton);
+  return isNaN(val) || val <= 0 ? 1 : val;
 }
 
 // Check Role
@@ -93,7 +100,7 @@ function populateCategoriesDropdown(products) {
   });
 }
 
-// Render Products Grid
+// Render Products Grid مع دعم التحكم بالكراتين والحبات والكسور
 function renderProductsGrid(prods) {
   const grid = document.getElementById('productsGrid');
   if (!grid) return;
@@ -108,9 +115,10 @@ function renderProductsGrid(prods) {
     const isOutOfStock = p.quantity <= 0;
     const name = p.name_en || p.name_ar;
     const imgUrl = p.image_url || 'https://via.placeholder.com/100';
-    const boxCap = p.items_per_box || 1;
-    const currentQty = selectedQuantities[p.id] || 0;
-    const isSelected = currentQty > 0;
+    const boxCap = getBoxCapacity(p);
+    const currentQtyPcs = selectedQuantities[p.id] || 0;
+    const currentBoxes = Number((currentQtyPcs / boxCap).toFixed(2));
+    const isSelected = currentQtyPcs > 0;
 
     grid.innerHTML += `
       <div class="product-card ${isSelected ? 'selected' : ''}" id="pcard-${p.id}" style="padding: 8px; border: 1px solid var(--border-color, #444); border-radius: 6px; text-align: center; background: var(--card-bg, #1e1e1e);">
@@ -130,10 +138,19 @@ function renderProductsGrid(prods) {
         ${isOutOfStock ? `
           <div style="font-size: 0.65rem; color: #e53e3e; font-weight: bold; margin-top: 6px;">Out of Stock</div>
         ` : `
-          <div class="qty-control">
-            <button class="qty-btn" onclick="updateItemQty(${p.id}, -1)">-</button>
-            <input type="number" class="qty-input" id="pinput-${p.id}" value="${currentQty}" min="0" max="${p.quantity}" onchange="manualSetQty(${p.id}, this.value)">
-            <button class="qty-btn" onclick="updateItemQty(${p.id}, 1)">+</button>
+          <div class="qty-control-box" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+            <!-- التحكم بالكراتين -->
+            <div style="display:flex; align-items:center; justify-content:center; gap:2px;">
+              <span style="font-size:0.6rem; color:var(--text-muted); width:32px;">Box:</span>
+              <button class="qty-btn" style="padding:1px 6px;" onclick="updateItemBoxes(${p.id}, -1)">-</button>
+              <input type="number" class="qty-input" id="boxinput-${p.id}" value="${currentBoxes}" min="0" step="any" style="width:45px; text-align:center; font-size:0.75rem;" onchange="manualSetBoxes(${p.id}, this.value)">
+              <button class="qty-btn" style="padding:1px 6px;" onclick="updateItemBoxes(${p.id}, 1)">+</button>
+            </div>
+            <!-- إدخال الحبات المباشر -->
+            <div style="display:flex; align-items:center; justify-content:center; gap:2px;">
+              <span style="font-size:0.6rem; color:var(--text-muted); width:32px;">Pcs:</span>
+              <input type="number" class="qty-input" id="pinput-${p.id}" value="${currentQtyPcs}" min="0" max="${p.quantity}" step="any" style="width:75px; text-align:center; font-size:0.75rem;" onchange="manualSetQty(${p.id}, this.value)">
+            </div>
           </div>
         `}
       </div>
@@ -159,57 +176,82 @@ function filterProducts() {
   renderProductsGrid(filtered);
 }
 
-function updateItemQty(prodId, change) {
+// تعديل بالكراتين (+1 كرتون / -1 كرتون)
+function updateItemBoxes(prodId, change) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
 
-  let current = selectedQuantities[prodId] || 0;
-  let updated = current + change;
+  const boxCap = getBoxCapacity(prod);
+  let currentPcs = selectedQuantities[prodId] || 0;
+  let currentBoxes = currentPcs / boxCap;
+  
+  let newBoxes = currentBoxes + change;
+  if (newBoxes < 0) newBoxes = 0;
 
-  if (updated < 0) updated = 0;
-  if (updated > prod.quantity) {
-    alert(`Max available stock is ${prod.quantity}`);
-    updated = prod.quantity;
+  let newPcs = Number((newBoxes * boxCap).toFixed(2));
+  if (newPcs > prod.quantity) {
+    alert(`Max available stock is ${prod.quantity} Pcs`);
+    newPcs = prod.quantity;
   }
 
-  if (updated === 0) {
-    delete selectedQuantities[prodId];
-  } else {
-    selectedQuantities[prodId] = updated;
-  }
-
-  const inputEl = document.getElementById(`pinput-${prodId}`);
-  if (inputEl) inputEl.value = updated;
-
-  const cardEl = document.getElementById(`pcard-${prodId}`);
-  if (cardEl) {
-    if (updated > 0) cardEl.classList.add('selected');
-    else cardEl.classList.remove('selected');
-  }
-
-  updateSelectedSummary();
+  applyQtyUpdate(prodId, newPcs);
 }
 
+// إدخال الكراتين يدوياً (يدعم الكسور مثل 0.8)
+function manualSetBoxes(prodId, value) {
+  const prod = availableProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const boxCap = getBoxCapacity(prod);
+  let boxes = parseFloat(value) || 0;
+  if (boxes < 0) boxes = 0;
+
+  let pcs = Number((boxes * boxCap).toFixed(2));
+  if (pcs > prod.quantity) {
+    alert(`Max available stock is ${prod.quantity} Pcs`);
+    pcs = prod.quantity;
+  }
+
+  applyQtyUpdate(prodId, pcs);
+}
+
+// إدخال الحبات يدوياً
 function manualSetQty(prodId, value) {
   const prod = availableProducts.find(p => p.id === prodId);
   if (!prod) return;
 
-  let val = parseInt(value) || 0;
+  let val = parseFloat(value) || 0;
   if (val < 0) val = 0;
   if (val > prod.quantity) {
     alert(`Max available stock is ${prod.quantity}`);
     val = prod.quantity;
   }
 
-  if (val === 0) delete selectedQuantities[prodId];
-  else selectedQuantities[prodId] = val;
+  applyQtyUpdate(prodId, val);
+}
 
-  const inputEl = document.getElementById(`pinput-${prodId}`);
-  if (inputEl) inputEl.value = val;
+// تطبيق التحديث على الذاكرة والشاشة
+function applyQtyUpdate(prodId, pcsQty) {
+  const prod = availableProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const boxCap = getBoxCapacity(prod);
+
+  if (pcsQty === 0) {
+    delete selectedQuantities[prodId];
+  } else {
+    selectedQuantities[prodId] = pcsQty;
+  }
+
+  const pcsInput = document.getElementById(`pinput-${prodId}`);
+  if (pcsInput) pcsInput.value = pcsQty;
+
+  const boxInput = document.getElementById(`boxinput-${prodId}`);
+  if (boxInput) boxInput.value = Number((pcsQty / boxCap).toFixed(2));
 
   const cardEl = document.getElementById(`pcard-${prodId}`);
   if (cardEl) {
-    if (val > 0) cardEl.classList.add('selected');
+    if (pcsQty > 0) cardEl.classList.add('selected');
     else cardEl.classList.remove('selected');
   }
 
@@ -238,7 +280,9 @@ function openOrderPreview() {
 
   selectedIds.forEach(id => {
     const p = availableProducts.find(item => item.id == id);
-    const qty = selectedQuantities[id];
+    const qtyPcs = selectedQuantities[id];
+    const boxCap = getBoxCapacity(p);
+    const boxesCount = Number((qtyPcs / boxCap).toFixed(2));
     const imgUrl = p.image_url || 'https://via.placeholder.com/50';
     const name = p.name_en || p.name_ar;
 
@@ -248,7 +292,7 @@ function openOrderPreview() {
         <div style="flex: 1;">
           <div style="font-weight: bold; font-size: 0.9rem; color: var(--text-color);">${name}</div>
           <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
-            Quantity: <strong style="color: var(--primary-color, #2e7d32); font-size:0.95rem;">${qty} Pcs</strong>
+            Quantity: <strong style="color: var(--primary-color, #2e7d32); font-size:0.95rem;">${boxesCount} Boxes (${qtyPcs} Pcs)</strong>
           </div>
         </div>
       </div>
@@ -314,14 +358,18 @@ async function confirmAndSubmitOrder() {
 
   const orderItems = selectedIds.map(id => {
     const p = availableProducts.find(item => item.id == id);
-    const qty = selectedQuantities[id];
+    const qtyPcs = selectedQuantities[id];
+    const boxCap = getBoxCapacity(p);
+    const boxesQty = Number((qtyPcs / boxCap).toFixed(2));
+
     return {
       order_id: newOrder.id,
       product_sku: p.sku,
       product_name: p.name_en || p.name_ar,
       image_url: p.image_url,
-      quantity_pieces: qty,
-      box_capacity: p.items_per_box
+      quantity_pieces: qtyPcs,
+      boxes_qty: boxesQty,
+      box_capacity: boxCap
     };
   });
 
@@ -417,9 +465,7 @@ async function loadOrders() {
   });
 }
 
-// -------------------------------------------------------------
-// Update Order Status (تطوير عملية الإرجاع أو الخصم حسب الحالة)
-// -------------------------------------------------------------
+// Update Order Status (إرجاع أو خصم الكمية حسب تغيير الحالة)
 async function updateOrderStatus(orderId, newStatus) {
   if (!isAdminOrManager()) {
     alert("Sorry, you do not have permission to change order status!");
@@ -432,7 +478,6 @@ async function updateOrderStatus(orderId, newStatus) {
 
   if (oldStatus === newStatus) return;
 
-  // جلب عناصر الطلب للتعديل
   const { data: items, error: itemsErr } = await _supabase
     .from('order_items')
     .select('*')
@@ -442,7 +487,6 @@ async function updateOrderStatus(orderId, newStatus) {
     const isNowCancelled = newStatus === 'Cancelled' || newStatus === 'ملغي';
     const wasCancelled = oldStatus === 'Cancelled' || oldStatus === 'ملغي';
 
-    // 1. عند تحويل الطلب إلى ملغي: إرجاع الكمية للمخزون
     if (isNowCancelled && !wasCancelled) {
       for (const item of items) {
         if (item.product_sku) {
@@ -461,7 +505,6 @@ async function updateOrderStatus(orderId, newStatus) {
         }
       }
     } 
-    // 2. عند تغيير الحالة من ملغي إلى حالة أخرى: اعادة خصم الكمية من المخزون
     else if (!isNowCancelled && wasCancelled) {
       for (const item of items) {
         if (item.product_sku) {
@@ -507,7 +550,8 @@ async function viewOrderDetails(orderId) {
   const content = document.getElementById('orderDetailsContent');
   if (content) {
     const itemsHtml = (items || []).map(i => {
-      const boxes = (i.quantity_pieces / (i.box_capacity || 1)).toFixed(1);
+      const boxCap = i.box_capacity || 1;
+      const boxes = i.boxes_qty !== undefined ? i.boxes_qty : Number((i.quantity_pieces / boxCap).toFixed(2));
       const imgUrl = i.image_url || 'https://via.placeholder.com/50';
       
       return `
@@ -516,8 +560,8 @@ async function viewOrderDetails(orderId) {
           <div style="flex: 1;">
             <div style="font-weight: bold; font-size: 0.95rem; color: var(--text-color, #fff);">${i.product_name}</div>
             <div style="font-size: 0.82rem; color: var(--text-muted, #aaa); margin-top: 2px;">
-              Quantity: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${i.quantity_pieces}</span> Pcs 
-              <span style="opacity: 0.8;">(${boxes} Boxes)</span>
+              Boxes: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${boxes}</span> Box 
+              <span style="opacity: 0.8;">(${i.quantity_pieces} Pcs)</span>
             </div>
           </div>
         </div>
@@ -600,12 +644,16 @@ async function exportOrders() {
         orderItems.forEach(i => {
           const sku = i.product_sku || '-';
           const matchedProd = prodMap[sku] || {};
+          const boxCap = i.box_capacity || 1;
+          const boxes = i.boxes_qty !== undefined ? i.boxes_qty : Number(((i.quantity_pieces || 0) / boxCap).toFixed(2));
+
           rows.push({
             "Order Number": o.order_number || '-',
             "Requested By": o.user_name || '-',
             "SKU": sku,
             "Product Name (Ar)": matchedProd.name_ar || i.product_name || '-',
             "Product Name (En)": matchedProd.name_en || i.product_name || '-',
+            "Boxes": boxes,
             "Quantity (Pcs)": i.quantity_pieces || 0,
             "Status": o.status || '-',
             "Order Date": orderDateFormatted,
@@ -619,6 +667,7 @@ async function exportOrders() {
           "SKU": '-',
           "Product Name (Ar)": 'No items',
           "Product Name (En)": 'No items',
+          "Boxes": 0,
           "Quantity (Pcs)": 0,
           "Status": o.status || '-',
           "Order Date": orderDateFormatted,
