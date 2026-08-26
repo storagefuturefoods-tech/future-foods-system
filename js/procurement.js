@@ -17,8 +17,8 @@ let activeTabFilter = 'All';
 // دالة مساعدة للحصول على سعة الكرتون من العمود الصحيح في قاعدة البيانات
 function getBoxCapacity(product) {
   if (!product) return 1;
-  const val = parseInt(product.items_per_box || product.pcs_per_carton || product.pcs_per_box, 10);
-  return isNaN(val) || val < 1 ? 1 : val;
+  const val = parseFloat(product.items_per_box || product.pcs_per_carton || product.pcs_per_box);
+  return isNaN(val) || val <= 0 ? 1 : val;
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -83,8 +83,9 @@ function renderOrdersList() {
       const isReceived = i.received === true;
       const pcsPerCarton = getBoxCapacity(i);
       
-      const boxesCount = i.boxes_qty || Math.ceil(i.qty / pcsPerCarton) || 1;
-      const totalPcs = i.qty || (boxesCount * pcsPerCarton);
+      const totalPcs = i.qty || 0;
+      // حساب الكراتين الدقيق مع الكسور
+      const boxesCount = i.boxes_qty !== undefined ? i.boxes_qty : Number((totalPcs / pcsPerCarton).toFixed(2));
 
       return `
         <div class="item-row" style="${isReceived ? 'opacity:0.75; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
@@ -125,7 +126,7 @@ function renderOrdersList() {
                   ` : `
                     <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
                       <span style="font-size:0.75rem; color:#aaa;">Recv Qty (Pcs):</span>
-                      <input type="number" id="recv-qty-${order.id}-${idx}" value="${totalPcs}" min="0" class="qty-input">
+                      <input type="number" id="recv-qty-${order.id}-${idx}" value="${totalPcs}" min="0" step="any" class="qty-input">
                       <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
                         <i class="fa-solid fa-boxes-packing"></i> Receive & Stock
                       </button>
@@ -206,7 +207,7 @@ function renderOrderItems() {
 
   currentOrderItems.forEach((item, index) => {
     const pcsPerBox = getBoxCapacity(item);
-    const boxesCount = item.boxes_qty || 1;
+    const boxesCount = item.boxes_qty !== undefined ? item.boxes_qty : 1;
     const totalPcs = item.custom_total_pcs !== undefined ? item.custom_total_pcs : (boxesCount * pcsPerBox);
 
     container.innerHTML += `
@@ -224,14 +225,14 @@ function renderOrderItems() {
             <span class="unit-label">Boxes</span>
             <div class="qty-picker">
               <button class="qty-btn" onclick="updateItemBoxes(${index}, -1)">-</button>
-              <input type="number" class="qty-input" value="${boxesCount}" min="1" onchange="setItemBoxesDirect(${index}, this.value)">
+              <input type="number" class="qty-input" value="${boxesCount}" min="0" step="any" onchange="setItemBoxesDirect(${index}, this.value)">
               <button class="qty-btn" onclick="updateItemBoxes(${index}, 1)">+</button>
             </div>
           </div>
 
           <div class="unit-group">
             <span class="unit-label">Total Pcs</span>
-            <input type="number" class="qty-input" value="${totalPcs}" min="1" onchange="setItemTotalPcsDirect(${index}, this.value)">
+            <input type="number" class="qty-input" value="${totalPcs}" min="1" step="any" onchange="setItemTotalPcsDirect(${index}, this.value)">
           </div>
 
           <button class="btn" style="background:none; color:#ef4444; border:none; font-size:1.1rem; cursor:pointer;" onclick="removeProductFromOrder(${index})">
@@ -245,38 +246,40 @@ function renderOrderItems() {
 
 function updateItemBoxes(index, change) {
   if (currentOrderItems[index]) {
-    let current = currentOrderItems[index].boxes_qty || 1;
+    let current = parseFloat(currentOrderItems[index].boxes_qty) || 1;
     let newQty = current + change;
-    if (newQty < 1) newQty = 1;
+    if (newQty < 0) newQty = 0;
 
     const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
-    currentOrderItems[index].boxes_qty = newQty;
-    currentOrderItems[index].custom_total_pcs = newQty * pcsPerBox;
+    currentOrderItems[index].boxes_qty = Number(newQty.toFixed(2));
+    currentOrderItems[index].custom_total_pcs = Number((newQty * pcsPerBox).toFixed(2));
     renderOrderItems();
   }
 }
 
 function setItemBoxesDirect(index, value) {
-  let val = parseInt(value, 10) || 1;
-  if (val < 1) val = 1;
+  let val = parseFloat(value) || 0;
+  if (val < 0) val = 0;
   if (currentOrderItems[index]) {
     const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
-    currentOrderItems[index].boxes_qty = val;
-    currentOrderItems[index].custom_total_pcs = val * pcsPerBox;
+    currentOrderItems[index].boxes_qty = Number(val.toFixed(2));
+    currentOrderItems[index].custom_total_pcs = Number((val * pcsPerBox).toFixed(2));
     renderOrderItems();
   }
 }
 
 function setItemTotalPcsDirect(index, value) {
-  let pcs = parseInt(value, 10) || 1;
-  if (pcs < 1) pcs = 1;
+  let pcs = parseFloat(value) || 0;
+  if (pcs < 0) pcs = 0;
 
   if (currentOrderItems[index]) {
     const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
-    const calculatedBoxes = Math.ceil(pcs / pcsPerBox);
+    
+    // حساب قسمة الكراتين بدقة مع التدوير لمنزلتي أرقام عشرية
+    const calculatedBoxes = Number((pcs / pcsPerBox).toFixed(2));
 
     currentOrderItems[index].custom_total_pcs = pcs;
-    currentOrderItems[index].boxes_qty = calculatedBoxes < 1 ? 1 : calculatedBoxes;
+    currentOrderItems[index].boxes_qty = calculatedBoxes;
     
     renderOrderItems();
   }
@@ -393,7 +396,7 @@ async function submitSupplyOrder() {
   const notes = document.getElementById('orderNotesInput').value.trim();
   const formattedItems = currentOrderItems.map(item => {
     const pcsPerBox = getBoxCapacity(item);
-    const boxesQty = item.boxes_qty || 1;
+    const boxesQty = item.boxes_qty !== undefined ? item.boxes_qty : 1;
     const totalPcs = item.custom_total_pcs !== undefined ? item.custom_total_pcs : (boxesQty * pcsPerBox);
 
     return {
@@ -497,7 +500,7 @@ async function markSingleItemReceived(orderId, itemIndex) {
   if (!order || !order.items[itemIndex]) return;
 
   const inputEl = document.getElementById(`recv-qty-${orderId}-${itemIndex}`);
-  const actualQty = inputEl ? (parseInt(inputEl.value, 10) || 0) : order.items[itemIndex].qty;
+  const actualQty = inputEl ? (parseFloat(inputEl.value) || 0) : order.items[itemIndex].qty;
 
   order.items[itemIndex].received = true;
   order.items[itemIndex].actual_received_qty = actualQty;
@@ -531,7 +534,7 @@ async function bulkMarkReceived(orderId) {
     const item = order.items[idx];
     if (item && !item.received) {
       const inputEl = document.getElementById(`recv-qty-${orderId}-${idx}`);
-      const actualQty = inputEl ? (parseInt(inputEl.value, 10) || 0) : item.qty;
+      const actualQty = inputEl ? (parseFloat(inputEl.value) || 0) : item.qty;
 
       item.received = true;
       item.actual_received_qty = actualQty;
@@ -595,8 +598,8 @@ function exportOrderPDF(orderId) {
   const tbody = document.getElementById('pdfTableBody');
   tbody.innerHTML = (order.items || []).map(i => {
     const pcsPerBox = getBoxCapacity(i);
-    const boxes = i.boxes_qty || Math.ceil(i.qty / pcsPerBox) || 1;
-    const totalPcs = i.qty || (boxes * pcsPerBox);
+    const totalPcs = i.qty || 0;
+    const boxes = i.boxes_qty !== undefined ? i.boxes_qty : Number((totalPcs / pcsPerBox).toFixed(2));
 
     return `
       <tr>
