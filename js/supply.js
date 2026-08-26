@@ -389,6 +389,7 @@ async function confirmAndSubmitOrder() {
 
     return {
       order_id: newOrder.id,
+      order_number: orderNum, // إدخال رقم الطلب أيضاً لضمان التوافق
       product_sku: p.sku,
       product_name: p.name_en || p.name_ar,
       image_url: p.image_url,
@@ -415,6 +416,7 @@ async function confirmAndSubmitOrder() {
 
   await _supabase.from('order_logs').insert([{
     order_id: newOrder.id,
+    order_number: orderNum,
     status_change: 'Order Created (New)',
     action_by: empName
   }]);
@@ -506,7 +508,7 @@ async function updateOrderStatus(orderId, newStatus) {
   const { data: items, error: itemsErr } = await _supabase
     .from('order_items')
     .select('*')
-    .eq('order_id', orderId);
+    .or(`order_id.eq.${orderId}${currentOrder ? `,order_number.eq.${currentOrder.order_number}` : ''}`);
 
   if (!itemsErr && items && items.length > 0) {
     const isNowCancelled = newStatus === 'Cancelled' || newStatus === 'ملغي';
@@ -555,6 +557,7 @@ async function updateOrderStatus(orderId, newStatus) {
   await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
   await _supabase.from('order_logs').insert([{
     order_id: orderId,
+    order_number: currentOrder ? currentOrder.order_number : null,
     status_change: `Status changed to (${newStatus})`,
     action_by: empName
   }]);
@@ -562,12 +565,30 @@ async function updateOrderStatus(orderId, newStatus) {
   loadOrders();
 }
 
+// عرض التفاصيل بشكل يعتمد على order_id و order_number معاً لتجنب مشكلة عدم الظهور
 async function viewOrderDetails(orderId) {
-  const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
-  const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
+  const currentOrder = ordersList.find(o => o.id === orderId);
+  const orderNumber = currentOrder ? currentOrder.order_number : null;
+
+  // جلب العناصر بعدة طرق للتحقق من الرابط Correct Mapping
+  let queryItems = _supabase.from('order_items').select('*');
+  if (orderNumber) {
+    queryItems = queryItems.or(`order_id.eq.${orderId},order_number.eq.${orderNumber}`);
+  } else {
+    queryItems = queryItems.eq('order_id', orderId);
+  }
+
+  let queryLogs = _supabase.from('order_logs').select('*');
+  if (orderNumber) {
+    queryLogs = queryLogs.or(`order_id.eq.${orderId},order_number.eq.${orderNumber}`).order('created_at', { ascending: true });
+  } else {
+    queryLogs = queryLogs.eq('order_id', orderId).order('created_at', { ascending: true });
+  }
+
+  const { data: items } = await queryItems;
+  const { data: logs } = await queryLogs;
 
   const numElem = document.getElementById('modalOrderNum');
-  const currentOrder = ordersList.find(o => o.id === orderId);
   if (numElem && currentOrder) {
     numElem.innerText = `(${currentOrder.order_number})`;
   }
@@ -576,17 +597,17 @@ async function viewOrderDetails(orderId) {
   if (content) {
     const itemsHtml = (items || []).map(i => {
       const boxCap = i.box_capacity || 1;
-      const boxes = i.boxes_qty !== undefined ? i.boxes_qty : Number((i.quantity_pieces / boxCap).toFixed(2));
+      const boxes = i.boxes_qty !== undefined ? i.boxes_qty : Number(((i.quantity_pieces || 0) / boxCap).toFixed(2));
       const imgUrl = i.image_url || 'https://via.placeholder.com/50';
       
       return `
         <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--border-color, #333);">
           <img src="${imgUrl}" alt="${i.product_name}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color, #444); background: #222;" onerror="this.src='https://via.placeholder.com/48'">
           <div style="flex: 1;">
-            <div style="font-weight: bold; font-size: 0.95rem; color: var(--text-color, #fff);">${i.product_name}</div>
+            <div style="font-weight: bold; font-size: 0.95rem; color: var(--text-color, #fff);">${i.product_name || 'Item'}</div>
             <div style="font-size: 0.82rem; color: var(--text-muted, #aaa); margin-top: 2px;">
               Boxes: <span style="color:var(--primary-color, #4CAF50); font-weight:bold;">${boxes}</span> Box 
-              <span style="opacity: 0.8;">(${i.quantity_pieces} Pcs)</span>
+              <span style="opacity: 0.8;">(${i.quantity_pieces || 0} Pcs)</span>
             </div>
           </div>
         </div>
@@ -661,7 +682,7 @@ async function exportOrders() {
 
     const rows = [];
     selectedOrders.forEach(o => {
-      const orderItems = (items || []).filter(i => i.order_id === o.id);
+      const orderItems = (items || []).filter(i => i.order_id === o.id || i.order_number === o.order_number);
       const orderDateFormatted = formatDateForExcel(o.created_at);
       const lastUpdateFormatted = formatDateForExcel(lastUpdateMap[o.id] || o.updated_at || o.created_at);
 
