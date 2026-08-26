@@ -24,6 +24,18 @@ function isInvAdminOrManager() {
 async function loadProducts() {
   invCurrentUser = getInvCurrentUser();
 
+  // إظهار رسالة جاري التحميل فوراً
+  const tbody = document.getElementById('inventoryBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align:center; padding:30px; color:var(--text-muted, #aaa);">
+          Loading products...
+        </td>
+      </tr>
+    `;
+  }
+
   const { data, error } = await _supabase
     .from('products')
     .select('*')
@@ -31,6 +43,9 @@ async function loadProducts() {
 
   if (error) {
     alert("Error fetching products: " + error.message);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#e53e3e;">Failed to load products.</td></tr>`;
+    }
     return;
   }
 
