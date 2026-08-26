@@ -223,7 +223,7 @@ function updateSelectedSummary() {
 }
 
 // -------------------------------------------------------------
-// Open Independent Preview Modal (مع إظهار عدد الكراتين)
+// Open Independent Preview Modal
 // -------------------------------------------------------------
 function openOrderPreview() {
   const selectedIds = Object.keys(selectedQuantities);
@@ -239,8 +239,6 @@ function openOrderPreview() {
   selectedIds.forEach(id => {
     const p = availableProducts.find(item => item.id == id);
     const qty = selectedQuantities[id];
-    const boxCap = p.items_per_box || 1;
-    const boxes = (qty / boxCap).toFixed(1);
     const imgUrl = p.image_url || 'https://via.placeholder.com/50';
     const name = p.name_en || p.name_ar;
 
@@ -251,7 +249,6 @@ function openOrderPreview() {
           <div style="font-weight: bold; font-size: 0.9rem; color: var(--text-color);">${name}</div>
           <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
             Quantity: <strong style="color: var(--primary-color, #2e7d32); font-size:0.95rem;">${qty} Pcs</strong>
-            <span style="opacity: 0.85; font-weight: normal; margin-left: 6px;">(${boxes} Boxes)</span>
           </div>
         </div>
       </div>
@@ -324,7 +321,7 @@ async function confirmAndSubmitOrder() {
       product_name: p.name_en || p.name_ar,
       image_url: p.image_url,
       quantity_pieces: qty,
-      box_capacity: p.items_per_box || 1
+      box_capacity: p.items_per_box
     };
   });
 
@@ -421,7 +418,7 @@ async function loadOrders() {
 }
 
 // -------------------------------------------------------------
-// Update Order Status
+// Update Order Status (تطوير عملية الإرجاع أو الخصم حسب الحالة)
 // -------------------------------------------------------------
 async function updateOrderStatus(orderId, newStatus) {
   if (!isAdminOrManager()) {
@@ -497,9 +494,6 @@ async function updateOrderStatus(orderId, newStatus) {
   loadOrders();
 }
 
-// -------------------------------------------------------------
-// View Details & Audit Log (عرض تفاصيل الطلب والكراتين والسجل)
-// -------------------------------------------------------------
 async function viewOrderDetails(orderId) {
   const { data: items } = await _supabase.from('order_items').select('*').eq('order_id', orderId);
   const { data: logs } = await _supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
@@ -513,8 +507,7 @@ async function viewOrderDetails(orderId) {
   const content = document.getElementById('orderDetailsContent');
   if (content) {
     const itemsHtml = (items || []).map(i => {
-      const boxCap = i.box_capacity || 1;
-      const boxes = (i.quantity_pieces / boxCap).toFixed(1);
+      const boxes = (i.quantity_pieces / (i.box_capacity || 1)).toFixed(1);
       const imgUrl = i.image_url || 'https://via.placeholder.com/50';
       
       return `
@@ -550,7 +543,7 @@ async function viewOrderDetails(orderId) {
         <li style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-color, #ddd); list-style-type: disc;">
           <span style="font-weight: bold;">${l.status_change}</span>
           <span style="color: var(--text-muted, #aaa);"> by: </span>
-          <span style="color: #64B5F6;">${l.action_by || 'Admin'}</span>
+          <span style="color: #64B5F6;">${l.action_by}</span>
           <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 2px;">🕒 ${formattedDate}</div>
         </li>
       `;
@@ -577,9 +570,6 @@ function formatDateForExcel(dateString) {
   });
 }
 
-// -------------------------------------------------------------
-// Export Detailed Excel (مع تفاصيل الكراتين وسعة الصندوق)
-// -------------------------------------------------------------
 async function exportOrders() {
   const ids = Array.from(document.querySelectorAll('.order-select:checked')).map(cb => parseInt(cb.value));
   const selectedOrders = ids.length > 0 ? ordersList.filter(o => ids.includes(o.id)) : ordersList;
@@ -596,7 +586,7 @@ async function exportOrders() {
       if (!lastUpdateMap[l.order_id]) lastUpdateMap[l.order_id] = l.created_at;
     });
 
-    const { data: allProds } = await _supabase.from('products').select('sku, name_ar, name_en, items_per_box');
+    const { data: allProds } = await _supabase.from('products').select('sku, name_ar, name_en');
     const prodMap = {};
     (allProds || []).forEach(p => { if (p.sku) prodMap[p.sku] = p; });
 
@@ -610,9 +600,6 @@ async function exportOrders() {
         orderItems.forEach(i => {
           const sku = i.product_sku || '-';
           const matchedProd = prodMap[sku] || {};
-          const boxCap = i.box_capacity || matchedProd.items_per_box || 1;
-          const boxes = (i.quantity_pieces / boxCap).toFixed(1);
-
           rows.push({
             "Order Number": o.order_number || '-',
             "Requested By": o.user_name || '-',
@@ -620,8 +607,6 @@ async function exportOrders() {
             "Product Name (Ar)": matchedProd.name_ar || i.product_name || '-',
             "Product Name (En)": matchedProd.name_en || i.product_name || '-',
             "Quantity (Pcs)": i.quantity_pieces || 0,
-            "Box Capacity": boxCap,
-            "Calculated Boxes": parseFloat(boxes),
             "Status": o.status || '-',
             "Order Date": orderDateFormatted,
             "Last Update": lastUpdateFormatted
@@ -635,8 +620,6 @@ async function exportOrders() {
           "Product Name (Ar)": 'No items',
           "Product Name (En)": 'No items',
           "Quantity (Pcs)": 0,
-          "Box Capacity": 0,
-          "Calculated Boxes": 0,
           "Status": o.status || '-',
           "Order Date": orderDateFormatted,
           "Last Update": lastUpdateFormatted
