@@ -1,260 +1,402 @@
-let usersList = [];
-let settingsCurrentUser = {};
+let products = [];
+let filteredProducts = [];
+let invCurrentUser = {};
 
-async function initSettings() {
-  console.log("Initializing settings...");
-
+// Safe currentUser retrieval
+function getInvCurrentUser() {
   try {
-    settingsCurrentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
   } catch (e) {
-    settingsCurrentUser = {};
+    return {};
   }
-
-  await loadUsers();
 }
 
-async function loadUsers() {
-  const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
+// Check if user is Admin or Store Manager
+function isInvAdminOrManager() {
+  const u = getInvCurrentUser();
+  const role = (u.role || '').toLowerCase();
+  const email = (u.email || '').toLowerCase();
+  
+  return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
+}
+
+// Check if user has permission to Upload Excel
+function canUserUploadExcel() {
+  const u = getInvCurrentUser();
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_upload_excel !== false && isInvAdminOrManager();
+}
+
+// Check if user has permission to Delete Products
+function canUserDeleteProducts() {
+  const u = getInvCurrentUser();
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_delete_products !== false && isInvAdminOrManager();
+}
+
+// 1. Fetch products & filter based on user permission
+async function loadProducts() {
+  invCurrentUser = getInvCurrentUser();
+
+  // إظهار رسالة جاري التحميل فوراً
+  const tbody = document.getElementById('inventoryBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align:center; padding:30px; color:var(--text-muted, #aaa);">
+          Loading products...
+        </td>
+      </tr>
+    `;
+  }
+
+  const { data, error } = await _supabase
+    .from('products')
+    .select('*')
+    .order('id', { ascending: true });
 
   if (error) {
-    console.error("Error fetching users:", error);
-    alert("Error fetching users: " + error.message);
+    alert("Error fetching products: " + error.message);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#e53e3e;">Failed to load products.</td></tr>`;
+    }
     return;
   }
 
-  usersList = data || [];
-  renderUsersTable();
+  const rawProducts = data || [];
+
+  // Filter products by brand permission
+  const userBrandPermission = invCurrentUser.brand_permission || invCurrentUser.brand || 'All';
+  products = filterProductsByBrandPermission(rawProducts, userBrandPermission);
+  filteredProducts = [...products];
+
+  renderTable();
+  applyUserPermissions();
 }
 
-function renderUsersTable() {
-  let tbody = document.getElementById('usersBody');
-  if (!tbody) {
-    tbody = document.querySelector('table tbody');
+// 2. Flexible brand permission filter
+function filterProductsByBrandPermission(allProducts, userBrandPermission) {
+  const userBrand = (userBrandPermission || 'All').trim().toLowerCase();
+
+  if (
+    userBrand === 'all' || 
+    userBrand === '' || 
+    userBrand.includes('&') || 
+    userBrand.includes('pizzeria') || 
+    (userBrand.includes('marlin') && userBrand.includes('rudy'))
+  ) {
+    return allProducts;
   }
+
+  return allProducts.filter(p => {
+    const pBrand = (p.brand || '').trim().toLowerCase();
+    return (
+      pBrand === userBrand || 
+      pBrand === 'all' || 
+      pBrand.includes('&') || 
+      pBrand.includes('shared')
+    );
+  });
+}
+
+// 3. Search Handler (Filter by SKU, Name Ar, Name En)
+function handleSearch() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  if (!query) {
+    filteredProducts = [...products];
+  } else {
+    filteredProducts = products.filter(p => {
+      const sku = (p.sku || '').toLowerCase();
+      const nameAr = (p.name_ar || '').toLowerCase();
+      const nameEn = (p.name_en || '').toLowerCase();
+
+      return sku.includes(query) || nameAr.includes(query) || nameEn.includes(query);
+    });
+  }
+
+  renderTable();
+}
+
+// 4. Open Image Preview Modal
+function openImagePreview(url) {
+  const imgElem = document.getElementById('previewImageSrc');
+  if (imgElem) imgElem.src = url;
+  const modal = document.getElementById('imagePreviewModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+// 5. Render inventory table
+function renderTable() {
+  const tbody = document.getElementById('inventoryBody');
+  const countElem = document.getElementById('displayedCount');
 
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const isSuperAdmin = !settingsCurrentUser.email || 
-                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
-                       settingsCurrentUser.role === 'admin';
+  // Update displayed count counter
+  if (countElem) countElem.innerText = filteredProducts.length;
 
-  const addBtn = document.querySelector('button[onclick*="openModal"]');
-  if (addBtn) {
-    addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
-  }
-
-  const actionsHeader = document.querySelector('table th:last-child');
-  if (actionsHeader) {
-    actionsHeader.style.display = '';
-  }
-
-  if (usersList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">No users found.</td></tr>';
+  if (filteredProducts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">No products found.</td></tr>';
     return;
   }
 
-  usersList.forEach(u => {
-    let roleBadge = '';
-    if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;"><i class="fa-solid fa-user-shield"></i> System Admin</span>';
-    else if (u.role === 'store_manager') roleBadge = '<span style="color:#dd6b20; font-weight:bold;"><i class="fa-solid fa-user-tie"></i> Store Manager</span>';
-    else roleBadge = '<span style="color:#3182ce;"><i class="fa-solid fa-utensils"></i> Chef / Branch</span>';
+  const isUserAdmin = isInvAdminOrManager();
 
-    let brandDisplay = u.brand_permission || 'Not Specified';
-    if (u.brand_permission === 'All') brandDisplay = 'All Branches';
-    else if (u.brand_permission === 'Rudy') brandDisplay = 'Rudy (+ Shared)';
-    else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ Shared)';
-
-    const isSelf = settingsCurrentUser.id && u.id === settingsCurrentUser.id;
-
-    let actionsTd = '<td>';
-    if (isSuperAdmin) {
-      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-left:4px;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i> Edit</button>`;
-      actionsTd += `<button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button>`;
-    } else if (isSelf) {
-      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-key"></i> Change Password</button>`;
-    } else {
-      actionsTd += `<span style="color:#777; font-size:0.85rem;">-</span>`;
-    }
-    actionsTd += '</td>';
+  filteredProducts.forEach(p => {
+    const isLow = p.quantity <= (p.min_quantity || 0);
+    const imgUrl = p.image_url || 'https://via.placeholder.com/50';
+    
+    const actionsCell = isUserAdmin ? `
+      <td>
+        <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">Edit</button>
+        <button class="btn btn-status-action ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
+          ${p.is_disabled ? 'Enable' : 'Disable'}
+        </button>
+      </td>
+    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">View Only</span></td>`;
 
     tbody.innerHTML += `
-      <tr>
-        <td>${u.name || '-'}</td>
-        <td>${u.email || '-'}</td>
-        <td>${roleBadge}</td>
-        <td><strong>${brandDisplay}</strong></td>
-        ${actionsTd}
+      <tr style="${isLow ? 'background-color: rgba(255, 0, 0, 0.1);' : ''}">
+        <td><input type="checkbox" class="prod-select" value="${p.id}"></td>
+        <td>
+          <img src="${imgUrl}" width="40" height="40" 
+               style="object-fit:cover; border-radius:4px; cursor:pointer;" 
+               onerror="this.src='https://via.placeholder.com/40'" 
+               onclick="openImagePreview('${imgUrl}')" 
+               title="Click to view image">
+        </td>
+        <td>${p.sku || '-'}</td>
+        <td>${p.name_ar || '-'}</td>
+        <td>${p.name_en || '-'}</td>
+        <td>${p.brand || '-'}</td>
+        <td><span style="background:var(--input-bg, #eee); padding:2px 6px; border-radius:4px; font-size:0.85rem;">${p.category || '-'}</span></td>
+        <td>${p.quantity} ${isLow ? '⚠️' : ''}</td>
+        <td>${p.items_per_box || 1}</td>
+        <td>${p.is_disabled ? 'Disabled' : 'Active'}</td>
+        ${actionsCell}
       </tr>
     `;
   });
 }
 
-function openModal(modalId) {
-  const modal = document.getElementById(modalId || 'userModal');
-  if (!modal) return;
-  
-  toggleFormFields(true);
+// 6. Apply UI restrictions for users based on granular permissions
+function applyUserPermissions() {
+  const uploadBtn = document.getElementById('btnUploadExcel') || document.querySelector('button[onclick*="excelInput"]');
+  const deleteBtn = document.getElementById('btnDeleteSelected') || document.querySelector('button[onclick*="deleteSelected"]');
 
-  if (document.getElementById('uId')) document.getElementById('uId').value = '';
-  if (document.getElementById('uName')) document.getElementById('uName').value = '';
-  if (document.getElementById('uEmail')) document.getElementById('uEmail').value = '';
-  if (document.getElementById('uPass')) {
-    document.getElementById('uPass').value = '';
-    document.getElementById('uPass').required = true;
-  }
-  if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
-  
-  const passLabel = document.querySelector('#passGroup label');
-  if (passLabel) passLabel.innerText = "Temporary Password";
-
-  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = true;
-  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = true;
-  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = true;
-  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = true;
-
-  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Add New User';
-
-  modal.style.display = 'flex';
-}
-
-function openEditUser(id) {
-  const u = usersList.find(x => x.id === id);
-  if (!u) return;
-
-  const isSuperAdmin = !settingsCurrentUser.email || 
-                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
-                       settingsCurrentUser.role === 'admin';
-
-  if (document.getElementById('uId')) document.getElementById('uId').value = u.id;
-  if (document.getElementById('uName')) document.getElementById('uName').value = u.name || '';
-  if (document.getElementById('uEmail')) document.getElementById('uEmail').value = u.email || '';
-  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'chef';
-  if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
-
-  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = u.can_procure_order !== false;
-  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = u.can_receive_stock !== false;
-  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = u.can_upload_excel !== false;
-  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = u.can_delete_products !== false;
-
-  if (document.getElementById('uPass')) {
-    document.getElementById('uPass').value = '';
-    document.getElementById('uPass').required = !isSuperAdmin;
-  }
-
-  if (isSuperAdmin) {
-    toggleFormFields(true);
-    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'none';
-    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen"></i> Edit User Details';
-  } else {
-    toggleFormFields(false);
-    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
-    
-    const passLabel = document.querySelector('#passGroup label');
-    if (passLabel) passLabel.innerText = "New Password";
-
-    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
-  }
-  
-  const modal = document.getElementById('userModal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function toggleFormFields(showAll) {
-  const displayStyle = showAll ? 'block' : 'none';
-  const nameGroup = document.getElementById('uName')?.closest('.form-group');
-  const emailGroup = document.getElementById('uEmail')?.closest('.form-group');
-  const roleGroup = document.getElementById('uRole')?.closest('.form-group');
-  const brandGroup = document.getElementById('uBrand')?.closest('.form-group');
-  const procurementGroup = document.getElementById('procurementTogglesGroup');
-
-  if (nameGroup) nameGroup.style.display = displayStyle;
-  if (emailGroup) emailGroup.style.display = displayStyle;
-  if (roleGroup) roleGroup.style.display = displayStyle;
-  if (brandGroup) brandGroup.style.display = displayStyle;
-  if (procurementGroup) procurementGroup.style.display = displayStyle;
-}
-
-function closeModal(modalId) {
-  const modal = document.getElementById(modalId || 'userModal');
-  if (modal) modal.style.display = 'none';
-}
-
-async function saveUser(e) {
-  if (e && e.preventDefault) e.preventDefault();
-
-  const id = document.getElementById('uId')?.value;
-  const name = document.getElementById('uName')?.value;
-  const email = document.getElementById('uEmail')?.value;
-  const pass = document.getElementById('uPass')?.value;
-  const role = document.getElementById('uRole')?.value;
-  const brand_permission = document.getElementById('uBrand')?.value;
-  const can_procure_order = document.getElementById('uCanOrder')?.checked;
-  const can_receive_stock = document.getElementById('uCanReceive')?.checked;
-  const can_upload_excel = document.getElementById('uCanUploadExcel')?.checked;
-  const can_delete_products = document.getElementById('uCanDeleteProducts')?.checked;
-
-  const isSuperAdmin = !settingsCurrentUser.email || 
-                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
-                       settingsCurrentUser.role === 'admin';
-
-  if (id) {
-    let updateData = {};
-
-    if (isSuperAdmin) {
-      updateData = { 
-        name, 
-        email, 
-        role, 
-        brand_permission,
-        can_procure_order,
-        can_receive_stock,
-        can_upload_excel,
-        can_delete_products
-      };
+  // التحكم بإظهار أو إخفاء زر الرفع من إكسل
+  if (uploadBtn) {
+    if (!canUserUploadExcel()) {
+      uploadBtn.style.display = 'none';
     } else {
-      if (pass) updateData.password = pass;
+      uploadBtn.style.display = 'inline-block';
     }
+  }
 
-    const { error } = await _supabase.from('users').update(updateData).eq('id', id);
-
-    if (error) alert("Error updating user: " + error.message);
-    else {
-      alert(isSuperAdmin ? "User updated successfully!" : "Password changed successfully!");
-      closeModal('userModal');
-      loadUsers();
-    }
-  } else {
-    const { error } = await _supabase.from('users').insert([{
-      name,
-      email,
-      password: pass,
-      role,
-      brand_permission,
-      can_procure_order,
-      can_receive_stock,
-      can_upload_excel,
-      can_delete_products
-    }]);
-
-    if (error) alert("Error adding user: " + error.message);
-    else {
-      alert("User added successfully!");
-      closeModal('userModal');
-      loadUsers();
+  // التحكم بإظهار أو إخفاء زر الحذف
+  if (deleteBtn) {
+    if (!canUserDeleteProducts()) {
+      deleteBtn.style.display = 'none';
+    } else {
+      deleteBtn.style.display = 'inline-block';
     }
   }
 }
 
-async function deleteUser(id) {
-  if (!confirm("Are you sure you want to delete this user?")) return;
-  const { error } = await _supabase.from('users').delete().eq('id', id);
-  if (error) alert("Error deleting user: " + error.message);
-  else loadUsers();
+// 7. Download Excel template
+function downloadTemplate() {
+  const template = [
+    { 
+      sku: "712211", 
+      image_url: "https://via.placeholder.com/100", 
+      name_ar: "بطاطس حلوة مقلية", 
+      name_en: "Sweet fries", 
+      brand: "Rudy", 
+      category: "Vegetables", 
+      quantity: 15, 
+      min_quantity: 11, 
+      items_per_box: 1 
+    },
+    { 
+      sku: "712218", 
+      image_url: "https://via.placeholder.com/100", 
+      name_ar: "جبنة موزاريلا", 
+      name_en: "Buffalo Cheese", 
+      brand: "Rudy Pizzeria & B-Marlin", 
+      category: "Cheese", 
+      quantity: 36, 
+      min_quantity: 18, 
+      items_per_box: 12 
+    }
+  ];
+  const ws = XLSX.utils.json_to_sheet(template);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products_Template");
+  XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSettings);
-} else {
-  initSettings();
+// 8. Handle Excel Upload
+async function handleExcelUpload(e) {
+  if (!canUserUploadExcel()) {
+    alert("Sorry, you do not have permission to upload products via Excel.");
+    e.target.value = '';
+    return;
+  }
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  
+  reader.onload = async (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      let duplicates = [];
+      let validRows = [];
+
+      for (let r of rows) {
+        const skuStr = String(r.sku || r.SKU || '').trim();
+        if (!skuStr) continue;
+
+        const existsLocally = validRows.some(x => x.sku === skuStr);
+        const existsInDB = products.some(x => x.sku === skuStr);
+
+        if (existsLocally || existsInDB) {
+          duplicates.push(skuStr);
+        } else {
+          validRows.push({
+            sku: skuStr,
+            image_url: r.image_url || r.Image || '',
+            name_ar: r.name_ar || '',
+            name_en: r.name_en || '',
+            brand: r.brand || r.Brand || 'Rudy Pizzeria & B-Marlin',
+            category: String(r.category || r.Category || '').trim(),
+            quantity: parseInt(r.quantity || 0),
+            min_quantity: parseInt(r.min_quantity || 5),
+            items_per_box: parseInt(r.items_per_box || r.box_capacity || 1)
+          });
+        }
+      }
+
+      if (duplicates.length > 0) {
+        alert(`⚠️ Duplicate SKU codes ignored:\n${duplicates.join(', ')}`);
+      }
+
+      if (validRows.length > 0) {
+        const { error } = await _supabase.from('products').insert(validRows);
+        if (error) {
+          alert("Error inserting data: " + error.message);
+        } else {
+          alert(`Successfully uploaded ${validRows.length} products!`);
+          loadProducts();
+        }
+      }
+    } catch (err) {
+      alert("Error reading Excel file: " + err.message);
+    }
+    e.target.value = '';
+  };
+  
+  reader.readAsArrayBuffer(file);
 }
+
+// 9. Open Edit Modal
+function openEditModal(id) {
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
+
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('editProdId').value = p.id;
+  document.getElementById('editImage').value = p.image_url || '';
+  document.getElementById('editSku').value = p.sku || '';
+  document.getElementById('editNameAr').value = p.name_ar || '';
+  document.getElementById('editNameEn').value = p.name_en || '';
+  document.getElementById('editBrand').value = p.brand || '';
+  
+  const catInput = document.getElementById('editCategory');
+  if (catInput) catInput.value = p.category || '';
+
+  document.getElementById('editQty').value = p.quantity || 0;
+  document.getElementById('editMinQty').value = p.min_quantity || 0;
+  document.getElementById('editBoxCap').value = p.items_per_box || 1;
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeModal(id) { 
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none'; 
+}
+
+// 10. Save edited product
+async function saveProductEdit(e) {
+  e.preventDefault();
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
+
+  const id = document.getElementById('editProdId').value;
+  const catInput = document.getElementById('editCategory');
+
+  const updated = {
+    image_url: document.getElementById('editImage').value,
+    name_ar: document.getElementById('editNameAr').value,
+    name_en: document.getElementById('editNameEn').value,
+    brand: document.getElementById('editBrand').value,
+    category: catInput ? catInput.value.trim() : '',
+    quantity: parseInt(document.getElementById('editQty').value),
+    min_quantity: parseInt(document.getElementById('editMinQty').value),
+    items_per_box: parseInt(document.getElementById('editBoxCap').value)
+  };
+
+  const { error } = await _supabase.from('products').update(updated).eq('id', id);
+  if (error) {
+    alert("Error updating product: " + error.message);
+  } else {
+    closeModal('editModal');
+    loadProducts();
+  }
+}
+
+// 11. Toggle active/disabled status
+async function toggleStatus(id, currentStatus) {
+  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to toggle status.");
+  await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
+  loadProducts();
+}
+
+// 12. Delete selected products
+async function deleteSelected() {
+  if (!canUserDeleteProducts()) {
+    return alert("Sorry, you do not have permission to delete products.");
+  }
+
+  const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
+  if (ids.length === 0) return alert("Please select products to delete.");
+  if (confirm("Are you sure you want to delete the selected products?")) {
+    await _supabase.from('products').delete().in('id', ids);
+    loadProducts();
+  }
+}
+
+function toggleSelectAll(master) {
+  document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
+}
+
+// 13. Export products to Excel
+function exportSelected() {
+  const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
+  const listToExport = ids.length > 0 ? filteredProducts.filter(p => ids.includes(p.id)) : filteredProducts;
+  
+  if (listToExport.length === 0) return alert("No products to export.");
+
+  const ws = XLSX.utils.json_to_sheet(listToExport);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  XLSX.writeFile(wb, "Exported_Products.xlsx");
+}
+
+document.addEventListener('DOMContentLoaded', loadProducts);
