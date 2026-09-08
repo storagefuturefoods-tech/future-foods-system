@@ -2,23 +2,25 @@ let usersList = [];
 let settingsCurrentUser = {};
 
 async function initSettings() {
-  console.log("Initializing settings...");
-
   try {
-    settingsCurrentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    settingsCurrentUser = JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
   } catch (e) {
     settingsCurrentUser = {};
   }
-
   await loadUsers();
 }
 
 async function loadUsers() {
+  const tbody = document.getElementById('usersBody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Loading users...</td></tr>';
+  }
+
   const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
 
   if (error) {
     console.error("Error fetching users:", error);
-    alert("Error fetching users: " + error.message);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding:20px;">Error: ${error.message}</td></tr>`;
     return;
   }
 
@@ -27,11 +29,7 @@ async function loadUsers() {
 }
 
 function renderUsersTable() {
-  let tbody = document.getElementById('usersBody');
-  if (!tbody) {
-    tbody = document.querySelector('table tbody');
-  }
-
+  const tbody = document.getElementById('usersBody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
@@ -39,44 +37,31 @@ function renderUsersTable() {
                        settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
                        settingsCurrentUser.role === 'admin';
 
-  const addBtn = document.querySelector('button[onclick*="openModal"]');
-  if (addBtn) {
-    addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
-  }
-
-  const actionsHeader = document.querySelector('table th:last-child');
-  if (actionsHeader) {
-    actionsHeader.style.display = '';
-  }
-
   if (usersList.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">No users found.</td></tr>';
     return;
   }
 
   usersList.forEach(u => {
-    let roleBadge = '';
-    if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;"><i class="fa-solid fa-user-shield"></i> System Admin</span>';
-    else if (u.role === 'store_manager') roleBadge = '<span style="color:#dd6b20; font-weight:bold;"><i class="fa-solid fa-user-tie"></i> Store Manager</span>';
-    else roleBadge = '<span style="color:#3182ce;"><i class="fa-solid fa-utensils"></i> Chef / Branch</span>';
+    let roleBadge = u.role === 'admin' 
+      ? '<span style="color:#e53e3e; font-weight:bold;"><i class="fa-solid fa-user-shield"></i> System Admin</span>'
+      : '<span style="color:#3182ce;"><i class="fa-solid fa-user"></i> Standard User</span>';
 
-    let brandDisplay = u.brand_permission || 'Not Specified';
-    if (u.brand_permission === 'All') brandDisplay = 'All Branches';
-    else if (u.brand_permission === 'Rudy') brandDisplay = 'Rudy (+ Shared)';
-    else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ Shared)';
+    let brandDisplay = u.brand_permission || 'All Branches';
 
     const isSelf = settingsCurrentUser.id && u.id === settingsCurrentUser.id;
+    let actionsTd = '';
 
-    let actionsTd = '<td>';
     if (isSuperAdmin) {
-      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-left:4px;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i> Edit</button>`;
-      actionsTd += `<button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button>`;
+      actionsTd = `
+        <button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-right:4px;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i> Edit Permissions</button>
+        <button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button>
+      `;
     } else if (isSelf) {
-      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-key"></i> Change Password</button>`;
+      actionsTd = `<button class="btn" style="padding:4px 10px; font-size:0.85rem;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-key"></i> Change Password</button>`;
     } else {
-      actionsTd += `<span style="color:#777; font-size:0.85rem;">-</span>`;
+      actionsTd = `-`;
     }
-    actionsTd += '</td>';
 
     tbody.innerHTML += `
       <tr>
@@ -84,7 +69,7 @@ function renderUsersTable() {
         <td>${u.email || '-'}</td>
         <td>${roleBadge}</td>
         <td><strong>${brandDisplay}</strong></td>
-        ${actionsTd}
+        <td>${actionsTd}</td>
       </tr>
     `;
   });
@@ -93,8 +78,6 @@ function renderUsersTable() {
 function openModal(modalId) {
   const modal = document.getElementById(modalId || 'userModal');
   if (!modal) return;
-  
-  toggleFormFields(true);
 
   if (document.getElementById('uId')) document.getElementById('uId').value = '';
   if (document.getElementById('uName')) document.getElementById('uName').value = '';
@@ -103,17 +86,15 @@ function openModal(modalId) {
     document.getElementById('uPass').value = '';
     document.getElementById('uPass').required = true;
   }
-  if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
   
-  const passLabel = document.querySelector('#passGroup label');
-  if (passLabel) passLabel.innerText = "Temporary Password";
-
-  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = true;
-  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = true;
-  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = true;
-  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = true;
-
-  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Add New User';
+  // Reset Toggles (Off by default for new users)
+  document.getElementById('uCanEditInventory').checked = false;
+  document.getElementById('uCanAddProducts').checked = false;
+  document.getElementById('uCanDeleteProducts').checked = false;
+  document.getElementById('uCanUploadExcel').checked = false;
+  document.getElementById('uCanOrder').checked = false;
+  document.getElementById('uCanReceive').checked = false;
+  document.getElementById('uCanApproveRequests').checked = false;
 
   modal.style.display = 'flex';
 }
@@ -122,57 +103,23 @@ function openEditUser(id) {
   const u = usersList.find(x => x.id === id);
   if (!u) return;
 
-  const isSuperAdmin = !settingsCurrentUser.email || 
-                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
-                       settingsCurrentUser.role === 'admin';
-
   if (document.getElementById('uId')) document.getElementById('uId').value = u.id;
   if (document.getElementById('uName')) document.getElementById('uName').value = u.name || '';
   if (document.getElementById('uEmail')) document.getElementById('uEmail').value = u.email || '';
-  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'chef';
+  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'user';
   if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
 
-  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = u.can_procure_order !== false;
-  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = u.can_receive_stock !== false;
-  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = u.can_upload_excel !== false;
-  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = u.can_delete_products !== false;
+  // Load status directly from DB boolean flags
+  document.getElementById('uCanEditInventory').checked = u.can_edit_inventory === true;
+  document.getElementById('uCanAddProducts').checked = u.can_add_products === true;
+  document.getElementById('uCanDeleteProducts').checked = u.can_delete_products === true;
+  document.getElementById('uCanUploadExcel').checked = u.can_upload_excel === true;
+  document.getElementById('uCanOrder').checked = u.can_procure_order === true;
+  document.getElementById('uCanReceive').checked = u.can_receive_stock === true;
+  document.getElementById('uCanApproveRequests').checked = u.can_approve_requests === true;
 
-  if (document.getElementById('uPass')) {
-    document.getElementById('uPass').value = '';
-    document.getElementById('uPass').required = !isSuperAdmin;
-  }
-
-  if (isSuperAdmin) {
-    toggleFormFields(true);
-    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'none';
-    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen"></i> Edit User Details';
-  } else {
-    toggleFormFields(false);
-    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
-    
-    const passLabel = document.querySelector('#passGroup label');
-    if (passLabel) passLabel.innerText = "New Password";
-
-    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
-  }
-  
   const modal = document.getElementById('userModal');
   if (modal) modal.style.display = 'flex';
-}
-
-function toggleFormFields(showAll) {
-  const displayStyle = showAll ? 'block' : 'none';
-  const nameGroup = document.getElementById('uName')?.closest('.form-group');
-  const emailGroup = document.getElementById('uEmail')?.closest('.form-group');
-  const roleGroup = document.getElementById('uRole')?.closest('.form-group');
-  const brandGroup = document.getElementById('uBrand')?.closest('.form-group');
-  const procurementGroup = document.getElementById('procurementTogglesGroup');
-
-  if (nameGroup) nameGroup.style.display = displayStyle;
-  if (emailGroup) emailGroup.style.display = displayStyle;
-  if (roleGroup) roleGroup.style.display = displayStyle;
-  if (brandGroup) brandGroup.style.display = displayStyle;
-  if (procurementGroup) procurementGroup.style.display = displayStyle;
 }
 
 function closeModal(modalId) {
@@ -189,60 +136,36 @@ async function saveUser(e) {
   const pass = document.getElementById('uPass')?.value;
   const role = document.getElementById('uRole')?.value;
   const brand_permission = document.getElementById('uBrand')?.value;
-  const can_procure_order = document.getElementById('uCanOrder')?.checked;
-  const can_receive_stock = document.getElementById('uCanReceive')?.checked;
-  const can_upload_excel = document.getElementById('uCanUploadExcel')?.checked;
-  const can_delete_products = document.getElementById('uCanDeleteProducts')?.checked;
 
-  const isSuperAdmin = !settingsCurrentUser.email || 
-                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
-                       settingsCurrentUser.role === 'admin';
+  const payload = {
+    name,
+    email,
+    role,
+    brand_permission,
+    can_edit_inventory: document.getElementById('uCanEditInventory')?.checked,
+    can_add_products: document.getElementById('uCanAddProducts')?.checked,
+    can_delete_products: document.getElementById('uCanDeleteProducts')?.checked,
+    can_upload_excel: document.getElementById('uCanUploadExcel')?.checked,
+    can_procure_order: document.getElementById('uCanOrder')?.checked,
+    can_receive_stock: document.getElementById('uCanReceive')?.checked,
+    can_approve_requests: document.getElementById('uCanApproveRequests')?.checked
+  };
 
+  if (pass) payload.password = pass;
+
+  let error;
   if (id) {
-    let updateData = {};
-
-    if (isSuperAdmin) {
-      updateData = { 
-        name, 
-        email, 
-        role, 
-        brand_permission,
-        can_procure_order,
-        can_receive_stock,
-        can_upload_excel,
-        can_delete_products
-      };
-    } else {
-      if (pass) updateData.password = pass;
-    }
-
-    const { error } = await _supabase.from('users').update(updateData).eq('id', id);
-
-    if (error) alert("Error updating user: " + error.message);
-    else {
-      alert(isSuperAdmin ? "User updated successfully!" : "Password changed successfully!");
-      closeModal('userModal');
-      loadUsers();
-    }
+    ({ error } = await _supabase.from('users').update(payload).eq('id', id));
   } else {
-    const { error } = await _supabase.from('users').insert([{
-      name,
-      email,
-      password: pass,
-      role,
-      brand_permission,
-      can_procure_order,
-      can_receive_stock,
-      can_upload_excel,
-      can_delete_products
-    }]);
+    ({ error } = await _supabase.from('users').insert([payload]));
+  }
 
-    if (error) alert("Error adding user: " + error.message);
-    else {
-      alert("User added successfully!");
-      closeModal('userModal');
-      loadUsers();
-    }
+  if (error) {
+    alert("Error saving user: " + error.message);
+  } else {
+    alert("User permissions saved successfully!");
+    closeModal('userModal');
+    loadUsers();
   }
 }
 
@@ -253,8 +176,4 @@ async function deleteUser(id) {
   else loadUsers();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSettings);
-} else {
-  initSettings();
-}
+document.addEventListener('DOMContentLoaded', initSettings);
