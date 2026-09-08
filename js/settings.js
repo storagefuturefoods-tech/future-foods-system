@@ -110,6 +110,8 @@ function openModal(modalId) {
 
   if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = true;
   if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = true;
+  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = true;
+  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = true;
 
   if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Add New User';
 
@@ -132,6 +134,8 @@ function openEditUser(id) {
 
   if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = u.can_procure_order !== false;
   if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = u.can_receive_stock !== false;
+  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = u.can_upload_excel !== false;
+  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = u.can_delete_products !== false;
 
   if (document.getElementById('uPass')) {
     document.getElementById('uPass').value = '';
@@ -187,6 +191,8 @@ async function saveUser(e) {
   const brand_permission = document.getElementById('uBrand')?.value;
   const can_procure_order = document.getElementById('uCanOrder')?.checked;
   const can_receive_stock = document.getElementById('uCanReceive')?.checked;
+  const can_upload_excel = document.getElementById('uCanUploadExcel')?.checked;
+  const can_delete_products = document.getElementById('uCanDeleteProducts')?.checked;
 
   const isSuperAdmin = !settingsCurrentUser.email || 
                        settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
@@ -202,7 +208,9 @@ async function saveUser(e) {
         role, 
         brand_permission,
         can_procure_order,
-        can_receive_stock
+        can_receive_stock,
+        can_upload_excel,
+        can_delete_products
       };
     } else {
       if (pass) updateData.password = pass;
@@ -224,7 +232,9 @@ async function saveUser(e) {
       role,
       brand_permission,
       can_procure_order,
-      can_receive_stock
+      can_receive_stock,
+      can_upload_excel,
+      can_delete_products
     }]);
 
     if (error) alert("Error adding user: " + error.message);
