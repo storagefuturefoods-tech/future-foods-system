@@ -92,10 +92,10 @@ function setToggleState(elementId, state) {
 }
 
 // 1. فتح نافذة إضافة مستخدم جديد (متاحة للـ Admin فقط)
-function openModal() {
+function openModal(modalId) {
   if (!isSuperAdminUser()) return alert("Permission denied.");
 
-  const modal = document.getElementById('userModal');
+  const modal = document.getElementById(modalId || 'userModal');
   if (!modal) return;
 
   // إعادة ضبط العناصر
@@ -117,7 +117,6 @@ function openModal() {
   setToggleState('uCanUploadExcel', false);
   setToggleState('uCanOrder', false);
   setToggleState('uCanReceive', false);
-  setToggleState('uCanApproveRequests', false);
 
   modal.style.display = 'flex';
 }
@@ -132,7 +131,7 @@ function openEditUser(id) {
   if (document.getElementById('uId')) document.getElementById('uId').value = u.id;
   if (document.getElementById('uName')) document.getElementById('uName').value = u.name || '';
   if (document.getElementById('uEmail')) document.getElementById('uEmail').value = u.email || '';
-  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'user';
+  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'chef';
   if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
 
   if (document.getElementById('uPass')) {
@@ -148,7 +147,6 @@ function openEditUser(id) {
   setToggleState('uCanUploadExcel', u.can_upload_excel);
   setToggleState('uCanOrder', u.can_procure_order);
   setToggleState('uCanReceive', u.can_receive_stock);
-  setToggleState('uCanApproveRequests', u.can_approve_requests);
 
   // إخفاء الصلاحيات إجباري للمستخدم العادي
   toggleAdminOnlyFields(isSuper);
@@ -164,7 +162,7 @@ function toggleAdminOnlyFields(show) {
     el.style.display = show ? 'block' : 'none';
   });
 
-  const modalTitle = document.getElementById('modalUserTitle');
+  const modalTitle = document.getElementById('modalTitle') || document.getElementById('modalUserTitle');
   if (modalTitle) {
     modalTitle.innerText = show ? 'User Permissions & Details' : 'Change Password';
   }
@@ -195,15 +193,14 @@ async function saveUser(e) {
     payload = {
       name: document.getElementById('uName')?.value || '',
       email: document.getElementById('uEmail')?.value || '',
-      role: document.getElementById('uRole')?.value || 'user',
+      role: document.getElementById('uRole')?.value || 'chef',
       brand_permission: document.getElementById('uBrand')?.value || 'All',
       can_edit_inventory: document.getElementById('uCanEditInventory')?.checked || false,
       can_add_products: document.getElementById('uCanAddProducts')?.checked || false,
       can_delete_products: document.getElementById('uCanDeleteProducts')?.checked || false,
       can_upload_excel: document.getElementById('uCanUploadExcel')?.checked || false,
       can_procure_order: document.getElementById('uCanOrder')?.checked || false,
-      can_receive_stock: document.getElementById('uCanReceive')?.checked || false,
-      can_approve_requests: document.getElementById('uCanApproveRequests')?.checked || false
+      can_receive_stock: document.getElementById('uCanReceive')?.checked || false
     };
   } else {
     // إذا كان مستخدم عادي: يتم تحديث الاسم وكلمة السر فقط دون لمس الصلاحيات
