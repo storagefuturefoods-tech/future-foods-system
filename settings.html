@@ -5,11 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - User Management</title>
   <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
 
   <!-- Font Awesome Library for Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Modern Toggle Switches Style */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .toggle-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-color, #e2e8f0);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #4b5563; /* الرمادي للمطفي */
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #10b981; /* الأخضر للمفعل */
+    }
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+  </style>
 </head>
 <body>
   <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
@@ -20,14 +78,12 @@
       <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-clipboard-list"></i></a>
       <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-gear"></i></a>
       
-      <!-- Logout icon directly after Settings -->
       <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
     </nav>
     
     <div class="user-info" style="display: flex; align-items: center;">
-      <!-- Only user name displays here -->
       <span id="currentUserDisplay" style="font-weight: 600;"></span>
     </div>
   </header>
@@ -96,7 +152,28 @@
           </select>
         </div>
 
-        <div style="display:flex; gap:10px; margin-top:15px;">
+        <!-- Procurement Permissions Toggles -->
+        <div class="form-group" id="procurementTogglesGroup">
+          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Procurement Action Permissions:</label>
+          
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanOrder" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanReceive" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px;">
           <button type="submit" class="btn">Save Data</button>
           <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
         </div>
