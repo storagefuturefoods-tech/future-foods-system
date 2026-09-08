@@ -13,8 +13,11 @@ let allProducts = [];
 let currentOrderItems = [];
 let allOrdersList = [];
 let activeTabFilter = 'All';
+let currentUserPermissions = {
+  can_procure_order: true,
+  can_receive_stock: true
+};
 
-// دالة مساعدة للحصول على سعة الكرتون من العمود الصحيح في قاعدة البيانات
 function getBoxCapacity(product) {
   if (!product) return 1;
   const val = parseFloat(product.items_per_box || product.pcs_per_carton || product.pcs_per_box);
@@ -26,8 +29,34 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initProcurement() {
+  await fetchCurrentUserPermissions();
   await fetchProducts();
   await fetchOrders();
+}
+
+async function fetchCurrentUserPermissions() {
+  try {
+    const userLocal = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    if (userLocal && userLocal.email) {
+      const { data, error } = await _supabase
+        .from('users')
+        .select('can_procure_order, can_receive_stock, role')
+        .eq('email', userLocal.email)
+        .single();
+      
+      if (data) {
+        if (data.role === 'admin') {
+          currentUserPermissions.can_procure_order = true;
+          currentUserPermissions.can_receive_stock = true;
+        } else {
+          currentUserPermissions.can_procure_order = data.can_procure_order !== false;
+          currentUserPermissions.can_receive_stock = data.can_receive_stock !== false;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error loading user permissions:", e);
+  }
 }
 
 async function fetchProducts() {
@@ -84,18 +113,17 @@ function renderOrdersList() {
       const pcsPerCarton = getBoxCapacity(i);
       
       const totalPcs = i.qty || 0;
-      // حساب الكراتين الدقيق مع الكسور
       const boxesCount = i.boxes_qty !== undefined ? i.boxes_qty : Number((totalPcs / pcsPerCarton).toFixed(2));
 
       return `
         <div class="item-row" style="${isReceived ? 'opacity:0.75; background:rgba(16, 185, 129, 0.08);' : (isOrdered ? 'border-left: 4px solid #3b82f6;' : '')}">
           
           <div style="display:flex; align-items:center; gap:12px;">
-            ${(!isOrdered && !isReceived && order.status !== 'Cancelled') ? `
+            ${(!isOrdered && !isReceived && order.status !== 'Cancelled' && currentUserPermissions.can_procure_order) ? `
               <input type="checkbox" class="order-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Ordering">
             ` : ''}
 
-            ${(isOrdered && !isReceived && order.status !== 'Cancelled') ? `
+            ${(isOrdered && !isReceived && order.status !== 'Cancelled' && currentUserPermissions.can_receive_stock) ? `
               <input type="checkbox" class="recv-chk-${order.id}" value="${idx}" style="width:18px; height:18px; cursor:pointer;" title="Select for Receiving">
             ` : ''}
 
@@ -119,19 +147,23 @@ function renderOrdersList() {
                 isReceived ? `
                   <span style="color:#10b981; font-weight:bold; font-size:0.8rem;"><i class="fa-solid fa-circle-check"></i> In Stock</span>
                 ` : (
-                  !isOrdered ? `
-                    <button class="btn" style="background:#3b82f6; padding:4px 10px; font-size:0.75rem;" onclick="markSingleItemOrdered(${order.id}, ${idx})">
-                      <i class="fa-solid fa-paper-plane"></i> Order Item
-                    </button>
-                  ` : `
-                    <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
-                      <span style="font-size:0.75rem; color:#aaa;">Recv Qty (Pcs):</span>
-                      <input type="number" id="recv-qty-${order.id}-${idx}" value="${totalPcs}" min="0" step="any" class="qty-input">
-                      <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
-                        <i class="fa-solid fa-boxes-packing"></i> Receive & Stock
+                  !isOrdered ? (
+                    currentUserPermissions.can_procure_order ? `
+                      <button class="btn" style="background:#3b82f6; padding:4px 10px; font-size:0.75rem;" onclick="markSingleItemOrdered(${order.id}, ${idx})">
+                        <i class="fa-solid fa-paper-plane"></i> Order Item
                       </button>
-                    </div>
-                  `
+                    ` : '<span style="font-size:0.75rem; color:#888;"><i class="fa-solid fa-lock"></i> Order Restricted</span>'
+                  ) : (
+                    currentUserPermissions.can_receive_stock ? `
+                      <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; border:1px solid #444;">
+                        <span style="font-size:0.75rem; color:#aaa;">Recv Qty (Pcs):</span>
+                        <input type="number" id="recv-qty-${order.id}-${idx}" value="${totalPcs}" min="0" step="any" class="qty-input">
+                        <button class="btn" style="background:#10b981; padding:4px 8px; font-size:0.75rem;" onclick="markSingleItemReceived(${order.id}, ${idx})">
+                          <i class="fa-solid fa-boxes-packing"></i> Receive & Stock
+                        </button>
+                      </div>
+                    ` : '<span style="font-size:0.75rem; color:#888;"><i class="fa-solid fa-lock"></i> Receive Restricted</span>'
+                  )
                 )
               )}
 
@@ -165,7 +197,7 @@ function renderOrdersList() {
 
         <div class="order-body" id="body-${order.id}">
           
-          ${hasUnorderedItems && order.status !== 'Cancelled' ? `
+          ${hasUnorderedItems && order.status !== 'Cancelled' && currentUserPermissions.can_procure_order ? `
             <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59, 130, 246, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(59, 130, 246, 0.3);">
               <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
                 <input type="checkbox" onchange="toggleSelectAllOrderItems(${order.id}, this.checked)"> Select All for Procurement
@@ -176,7 +208,7 @@ function renderOrdersList() {
             </div>
           ` : ''}
 
-          ${hasReceivableItems && order.status !== 'Cancelled' ? `
+          ${hasReceivableItems && order.status !== 'Cancelled' && currentUserPermissions.can_receive_stock ? `
             <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16, 185, 129, 0.1); padding:8px 12px; border-radius:6px; margin-bottom:10px; border:1px solid rgba(16, 185, 129, 0.3);">
               <label style="font-size:0.85rem; font-weight:bold; cursor:pointer;">
                 <input type="checkbox" onchange="toggleSelectAllRecvItems(${order.id}, this.checked)"> Select All for Warehouse Receiving
@@ -274,8 +306,6 @@ function setItemTotalPcsDirect(index, value) {
 
   if (currentOrderItems[index]) {
     const pcsPerBox = getBoxCapacity(currentOrderItems[index]);
-    
-    // حساب قسمة الكراتين بدقة مع التدوير لمنزلتي أرقام عشرية
     const calculatedBoxes = Number((pcs / pcsPerBox).toFixed(2));
 
     currentOrderItems[index].custom_total_pcs = pcs;
@@ -459,6 +489,10 @@ function toggleSelectAllRecvItems(orderId, isChecked) {
 }
 
 async function markSingleItemOrdered(orderId, itemIndex) {
+  if (!currentUserPermissions.can_procure_order) {
+    return alert("You do not have permission to place procurement orders.");
+  }
+
   const order = allOrdersList.find(o => o.id === orderId);
   if (!order || !order.items[itemIndex]) return;
 
@@ -473,6 +507,10 @@ async function markSingleItemOrdered(orderId, itemIndex) {
 }
 
 async function bulkMarkOrdered(orderId) {
+  if (!currentUserPermissions.can_procure_order) {
+    return alert("You do not have permission to place procurement orders.");
+  }
+
   const order = allOrdersList.find(o => o.id === orderId);
   if (!order) return;
 
@@ -496,6 +534,10 @@ async function bulkMarkOrdered(orderId) {
 }
 
 async function markSingleItemReceived(orderId, itemIndex) {
+  if (!currentUserPermissions.can_receive_stock) {
+    return alert("You do not have permission to receive and update stock.");
+  }
+
   const order = allOrdersList.find(o => o.id === orderId);
   if (!order || !order.items[itemIndex]) return;
 
@@ -523,6 +565,10 @@ async function markSingleItemReceived(orderId, itemIndex) {
 }
 
 async function bulkMarkReceived(orderId) {
+  if (!currentUserPermissions.can_receive_stock) {
+    return alert("You do not have permission to receive and update stock.");
+  }
+
   const order = allOrdersList.find(o => o.id === orderId);
   if (!order) return;
 
