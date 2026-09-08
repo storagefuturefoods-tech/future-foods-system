@@ -11,30 +11,37 @@ function getInvCurrentUser() {
   }
 }
 
-// Check if user is Admin or Store Manager
-function isInvAdminOrManager() {
+// 1. Check Granular Action Permissions Based Strictly on User Toggles
+
+// الصلاحية العامة للتعديل على المخزون والمنتجات
+function canUserEditInventory() {
   const u = getInvCurrentUser();
-  const role = (u.role || '').toLowerCase();
-  const email = (u.email || '').toLowerCase();
-  
-  return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_edit_inventory === true;
 }
 
-// Check if user has permission to Upload Excel
+// صلاحية إضافة منتجات جديدة
+function canUserAddProducts() {
+  const u = getInvCurrentUser();
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_add_products === true;
+}
+
+// صلاحية رفع الملفات عبر الإكسل
 function canUserUploadExcel() {
   const u = getInvCurrentUser();
   if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
-  return u.can_upload_excel !== false && isInvAdminOrManager();
+  return u.can_upload_excel === true;
 }
 
-// Check if user has permission to Delete Products
+// صلاحية حذف المنتجات
 function canUserDeleteProducts() {
   const u = getInvCurrentUser();
   if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
-  return u.can_delete_products !== false && isInvAdminOrManager();
+  return u.can_delete_products === true;
 }
 
-// 1. Fetch products & filter based on user permission
+// 2. Fetch products & filter based on user permission
 async function loadProducts() {
   invCurrentUser = getInvCurrentUser();
 
@@ -74,7 +81,7 @@ async function loadProducts() {
   applyUserPermissions();
 }
 
-// 2. Flexible brand permission filter
+// 3. Flexible brand permission filter
 function filterProductsByBrandPermission(allProducts, userBrandPermission) {
   const userBrand = (userBrandPermission || 'All').trim().toLowerCase();
 
@@ -99,7 +106,7 @@ function filterProductsByBrandPermission(allProducts, userBrandPermission) {
   });
 }
 
-// 3. Search Handler (Filter by SKU, Name Ar, Name En)
+// 4. Search Handler (Filter by SKU, Name Ar, Name En)
 function handleSearch() {
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
 
@@ -118,7 +125,7 @@ function handleSearch() {
   renderTable();
 }
 
-// 4. Open Image Preview Modal
+// 5. Open Image Preview Modal
 function openImagePreview(url) {
   const imgElem = document.getElementById('previewImageSrc');
   if (imgElem) imgElem.src = url;
@@ -126,7 +133,7 @@ function openImagePreview(url) {
   if (modal) modal.style.display = 'flex';
 }
 
-// 5. Render inventory table
+// 6. Render inventory table
 function renderTable() {
   const tbody = document.getElementById('inventoryBody');
   const countElem = document.getElementById('displayedCount');
@@ -142,13 +149,14 @@ function renderTable() {
     return;
   }
 
-  const isUserAdmin = isInvAdminOrManager();
+  const canEdit = canUserEditInventory();
 
   filteredProducts.forEach(p => {
     const isLow = p.quantity <= (p.min_quantity || 0);
     const imgUrl = p.image_url || 'https://via.placeholder.com/50';
     
-    const actionsCell = isUserAdmin ? `
+    // إظهار أزرار التعديل والتعطيل فقط إذا كان للمستخدم صلاحية التعديل
+    const actionsCell = canEdit ? `
       <td>
         <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">Edit</button>
         <button class="btn btn-status-action ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
@@ -181,31 +189,27 @@ function renderTable() {
   });
 }
 
-// 6. Apply UI restrictions for users based on granular permissions
+// 7. Apply UI restrictions for users based on granular permissions
 function applyUserPermissions() {
   const uploadBtn = document.getElementById('btnUploadExcel') || document.querySelector('button[onclick*="excelInput"]');
   const deleteBtn = document.getElementById('btnDeleteSelected') || document.querySelector('button[onclick*="deleteSelected"]');
+  const addBtn = document.getElementById('btnAddProduct') || document.querySelector('button[onclick*="openAddModal"]');
 
-  // التحكم بإظهار أو إخفاء زر الرفع من إكسل
+  // التحكم بأزرار الإضافة والرفع والحذف بناءً على مفاتيح الصلاحية
   if (uploadBtn) {
-    if (!canUserUploadExcel()) {
-      uploadBtn.style.display = 'none';
-    } else {
-      uploadBtn.style.display = 'inline-block';
-    }
+    uploadBtn.style.display = canUserUploadExcel() ? 'inline-block' : 'none';
   }
 
-  // التحكم بإظهار أو إخفاء زر الحذف
   if (deleteBtn) {
-    if (!canUserDeleteProducts()) {
-      deleteBtn.style.display = 'none';
-    } else {
-      deleteBtn.style.display = 'inline-block';
-    }
+    deleteBtn.style.display = canUserDeleteProducts() ? 'inline-block' : 'none';
+  }
+
+  if (addBtn) {
+    addBtn.style.display = canUserAddProducts() ? 'inline-block' : 'none';
   }
 }
 
-// 7. Download Excel template
+// 8. Download Excel template
 function downloadTemplate() {
   const template = [
     { 
@@ -237,7 +241,7 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "Products_Template.xlsx");
 }
 
-// 8. Handle Excel Upload
+// 9. Handle Excel Upload
 async function handleExcelUpload(e) {
   if (!canUserUploadExcel()) {
     alert("Sorry, you do not have permission to upload products via Excel.");
@@ -306,9 +310,9 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// 9. Open Edit Modal
+// 10. Open Edit Modal
 function openEditModal(id) {
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
+  if (!canUserEditInventory()) return alert("Sorry, you do not have permission to edit products.");
 
   const p = products.find(x => x.id === id);
   if (!p) return;
@@ -333,10 +337,10 @@ function closeModal(id) {
   if (el) el.style.display = 'none'; 
 }
 
-// 10. Save edited product
+// 11. Save edited product
 async function saveProductEdit(e) {
   e.preventDefault();
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
+  if (!canUserEditInventory()) return alert("Sorry, you do not have permission to edit products.");
 
   const id = document.getElementById('editProdId').value;
   const catInput = document.getElementById('editCategory');
@@ -361,14 +365,14 @@ async function saveProductEdit(e) {
   }
 }
 
-// 11. Toggle active/disabled status
+// 12. Toggle active/disabled status
 async function toggleStatus(id, currentStatus) {
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to toggle status.");
+  if (!canUserEditInventory()) return alert("Sorry, you do not have permission to toggle status.");
   await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
   loadProducts();
 }
 
-// 12. Delete selected products
+// 13. Delete selected products
 async function deleteSelected() {
   if (!canUserDeleteProducts()) {
     return alert("Sorry, you do not have permission to delete products.");
@@ -386,7 +390,7 @@ function toggleSelectAll(master) {
   document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
 }
 
-// 13. Export products to Excel
+// 14. Export products to Excel
 function exportSelected() {
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
   const listToExport = ids.length > 0 ? filteredProducts.filter(p => ids.includes(p.id)) : filteredProducts;
