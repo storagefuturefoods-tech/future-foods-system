@@ -20,6 +20,20 @@ function isInvAdminOrManager() {
   return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
 }
 
+// Check if user has permission to Upload Excel
+function canUserUploadExcel() {
+  const u = getInvCurrentUser();
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_upload_excel !== false && isInvAdminOrManager();
+}
+
+// Check if user has permission to Delete Products
+function canUserDeleteProducts() {
+  const u = getInvCurrentUser();
+  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
+  return u.can_delete_products !== false && isInvAdminOrManager();
+}
+
 // 1. Fetch products & filter based on user permission
 async function loadProducts() {
   invCurrentUser = getInvCurrentUser();
@@ -167,16 +181,27 @@ function renderTable() {
   });
 }
 
-// 6. Apply UI restrictions for regular users
+// 6. Apply UI restrictions for users based on granular permissions
 function applyUserPermissions() {
-  if (!isInvAdminOrManager()) {
-    const uploadBtn = document.querySelector('button[onclick*="excelInput"]');
-    const deleteBtn = document.querySelector('button[onclick*="deleteSelected"]');
-    const fileInput = document.getElementById('excelInput');
+  const uploadBtn = document.getElementById('btnUploadExcel') || document.querySelector('button[onclick*="excelInput"]');
+  const deleteBtn = document.getElementById('btnDeleteSelected') || document.querySelector('button[onclick*="deleteSelected"]');
 
-    if (uploadBtn) uploadBtn.style.display = 'none';
-    if (deleteBtn) deleteBtn.style.display = 'none';
-    if (fileInput) fileInput.style.display = 'none';
+  // التحكم بإظهار أو إخفاء زر الرفع من إكسل
+  if (uploadBtn) {
+    if (!canUserUploadExcel()) {
+      uploadBtn.style.display = 'none';
+    } else {
+      uploadBtn.style.display = 'inline-block';
+    }
+  }
+
+  // التحكم بإظهار أو إخفاء زر الحذف
+  if (deleteBtn) {
+    if (!canUserDeleteProducts()) {
+      deleteBtn.style.display = 'none';
+    } else {
+      deleteBtn.style.display = 'inline-block';
+    }
   }
 }
 
@@ -214,8 +239,9 @@ function downloadTemplate() {
 
 // 8. Handle Excel Upload
 async function handleExcelUpload(e) {
-  if (!isInvAdminOrManager()) {
-    alert("Sorry, you do not have permission to add or edit products.");
+  if (!canUserUploadExcel()) {
+    alert("Sorry, you do not have permission to upload products via Excel.");
+    e.target.value = '';
     return;
   }
 
@@ -344,7 +370,9 @@ async function toggleStatus(id, currentStatus) {
 
 // 12. Delete selected products
 async function deleteSelected() {
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to delete products.");
+  if (!canUserDeleteProducts()) {
+    return alert("Sorry, you do not have permission to delete products.");
+  }
 
   const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
   if (ids.length === 0) return alert("Please select products to delete.");
