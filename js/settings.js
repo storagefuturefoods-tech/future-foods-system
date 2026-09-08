@@ -75,6 +75,14 @@ function renderUsersTable() {
   });
 }
 
+// دالة مساعدة لتغيير حالة مفاتيح التبديل بأمان دون إحداث خطأ
+function setToggleState(elementId, state) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.checked = Boolean(state);
+  }
+}
+
 function openModal(modalId) {
   const modal = document.getElementById(modalId || 'userModal');
   if (!modal) return;
@@ -87,14 +95,14 @@ function openModal(modalId) {
     document.getElementById('uPass').required = true;
   }
   
-  // Reset Toggles (Off by default for new users)
-  document.getElementById('uCanEditInventory').checked = false;
-  document.getElementById('uCanAddProducts').checked = false;
-  document.getElementById('uCanDeleteProducts').checked = false;
-  document.getElementById('uCanUploadExcel').checked = false;
-  document.getElementById('uCanOrder').checked = false;
-  document.getElementById('uCanReceive').checked = false;
-  document.getElementById('uCanApproveRequests').checked = false;
+  // إعادة تعيين التبديلات بأمان
+  setToggleState('uCanEditInventory', false);
+  setToggleState('uCanAddProducts', false);
+  setToggleState('uCanDeleteProducts', false);
+  setToggleState('uCanUploadExcel', false);
+  setToggleState('uCanOrder', false);
+  setToggleState('uCanReceive', false);
+  setToggleState('uCanApproveRequests', false);
 
   modal.style.display = 'flex';
 }
@@ -109,14 +117,14 @@ function openEditUser(id) {
   if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'user';
   if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
 
-  // Load status directly from DB boolean flags
-  document.getElementById('uCanEditInventory').checked = u.can_edit_inventory === true;
-  document.getElementById('uCanAddProducts').checked = u.can_add_products === true;
-  document.getElementById('uCanDeleteProducts').checked = u.can_delete_products === true;
-  document.getElementById('uCanUploadExcel').checked = u.can_upload_excel === true;
-  document.getElementById('uCanOrder').checked = u.can_procure_order === true;
-  document.getElementById('uCanReceive').checked = u.can_receive_stock === true;
-  document.getElementById('uCanApproveRequests').checked = u.can_approve_requests === true;
+  // ضبط قيم التبديلات من قاعدة البيانات بأمان
+  setToggleState('uCanEditInventory', u.can_edit_inventory);
+  setToggleState('uCanAddProducts', u.can_add_products);
+  setToggleState('uCanDeleteProducts', u.can_delete_products);
+  setToggleState('uCanUploadExcel', u.can_upload_excel);
+  setToggleState('uCanOrder', u.can_procure_order);
+  setToggleState('uCanReceive', u.can_receive_stock);
+  setToggleState('uCanApproveRequests', u.can_approve_requests);
 
   const modal = document.getElementById('userModal');
   if (modal) modal.style.display = 'flex';
@@ -142,13 +150,13 @@ async function saveUser(e) {
     email,
     role,
     brand_permission,
-    can_edit_inventory: document.getElementById('uCanEditInventory')?.checked,
-    can_add_products: document.getElementById('uCanAddProducts')?.checked,
-    can_delete_products: document.getElementById('uCanDeleteProducts')?.checked,
-    can_upload_excel: document.getElementById('uCanUploadExcel')?.checked,
-    can_procure_order: document.getElementById('uCanOrder')?.checked,
-    can_receive_stock: document.getElementById('uCanReceive')?.checked,
-    can_approve_requests: document.getElementById('uCanApproveRequests')?.checked
+    can_edit_inventory: document.getElementById('uCanEditInventory')?.checked || false,
+    can_add_products: document.getElementById('uCanAddProducts')?.checked || false,
+    can_delete_products: document.getElementById('uCanDeleteProducts')?.checked || false,
+    can_upload_excel: document.getElementById('uCanUploadExcel')?.checked || false,
+    can_procure_order: document.getElementById('uCanOrder')?.checked || false,
+    can_receive_stock: document.getElementById('uCanReceive')?.checked || false,
+    can_approve_requests: document.getElementById('uCanApproveRequests')?.checked || false
   };
 
   if (pass) payload.password = pass;
