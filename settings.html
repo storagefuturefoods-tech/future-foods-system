@@ -152,9 +152,9 @@
           </select>
         </div>
 
-        <!-- Procurement Permissions Toggles -->
+        <!-- Procurement & Products Action Permissions Toggles -->
         <div class="form-group" id="procurementTogglesGroup">
-          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Procurement Action Permissions:</label>
+          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Action Permissions:</label>
           
           <div class="toggle-row">
             <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
@@ -168,6 +168,22 @@
             <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
             <label class="switch">
               <input type="checkbox" id="uCanReceive" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-file-excel" style="color:#f59e0b;"></i> Can Upload Excel Products</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanUploadExcel" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-trash-can" style="color:#ef4444;"></i> Can Delete Products</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanDeleteProducts" checked>
               <span class="slider"></span>
             </label>
           </div>
