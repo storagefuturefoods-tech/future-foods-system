@@ -1,205 +1,260 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings - User Management</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+let usersList = [];
+let settingsCurrentUser = {};
 
-  <!-- Font Awesome Library for Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+async function initSettings() {
+  console.log("Initializing settings...");
 
-  <style>
-    /* Modern Toggle Switches Style */
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      margin-top: 10px;
+  try {
+    settingsCurrentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  } catch (e) {
+    settingsCurrentUser = {};
+  }
+
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const { data, error } = await _supabase.from('users').select('*').order('id', { ascending: true });
+
+  if (error) {
+    console.error("Error fetching users:", error);
+    alert("Error fetching users: " + error.message);
+    return;
+  }
+
+  usersList = data || [];
+  renderUsersTable();
+}
+
+function renderUsersTable() {
+  let tbody = document.getElementById('usersBody');
+  if (!tbody) {
+    tbody = document.querySelector('table tbody');
+  }
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const isSuperAdmin = !settingsCurrentUser.email || 
+                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
+                       settingsCurrentUser.role === 'admin';
+
+  const addBtn = document.querySelector('button[onclick*="openModal"]');
+  if (addBtn) {
+    addBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
+  }
+
+  const actionsHeader = document.querySelector('table th:last-child');
+  if (actionsHeader) {
+    actionsHeader.style.display = '';
+  }
+
+  if (usersList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#aaa;">No users found.</td></tr>';
+    return;
+  }
+
+  usersList.forEach(u => {
+    let roleBadge = '';
+    if (u.role === 'admin') roleBadge = '<span style="color:#e53e3e; font-weight:bold;"><i class="fa-solid fa-user-shield"></i> System Admin</span>';
+    else if (u.role === 'store_manager') roleBadge = '<span style="color:#dd6b20; font-weight:bold;"><i class="fa-solid fa-user-tie"></i> Store Manager</span>';
+    else roleBadge = '<span style="color:#3182ce;"><i class="fa-solid fa-utensils"></i> Chef / Branch</span>';
+
+    let brandDisplay = u.brand_permission || 'Not Specified';
+    if (u.brand_permission === 'All') brandDisplay = 'All Branches';
+    else if (u.brand_permission === 'Rudy') brandDisplay = 'Rudy (+ Shared)';
+    else if (u.brand_permission === 'B-marlin') brandDisplay = 'B-marlin (+ Shared)';
+
+    const isSelf = settingsCurrentUser.id && u.id === settingsCurrentUser.id;
+
+    let actionsTd = '<td>';
+    if (isSuperAdmin) {
+      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem; margin-left:4px;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i> Edit</button>`;
+      actionsTd += `<button class="btn btn-danger" style="padding:4px 10px; font-size:0.85rem;" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button>`;
+    } else if (isSelf) {
+      actionsTd += `<button class="btn" style="padding:4px 10px; font-size:0.85rem;" onclick="openEditUser(${u.id})"><i class="fa-solid fa-key"></i> Change Password</button>`;
+    } else {
+      actionsTd += `<span style="color:#777; font-size:0.85rem;">-</span>`;
     }
-    .toggle-label {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-color, #e2e8f0);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 48px;
-      height: 24px;
-    }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #4b5563; /* الرمادي للمطفي */
-      transition: .3s;
-      border-radius: 24px;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .3s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background-color: #10b981; /* الأخضر للمفعل */
-    }
-    input:checked + .slider:before {
-      transform: translateX(24px);
-    }
-  </style>
-</head>
-<body>
-  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
-    <nav style="display: flex; align-items: center; gap: 12px;">
-      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
-      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
-      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
-      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-clipboard-list"></i></a>
-      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-gear"></i></a>
-      
-      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
-        <i class="fa-solid fa-right-from-bracket"></i>
-      </button>
-    </nav>
+    actionsTd += '</td>';
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${u.name || '-'}</td>
+        <td>${u.email || '-'}</td>
+        <td>${roleBadge}</td>
+        <td><strong>${brandDisplay}</strong></td>
+        ${actionsTd}
+      </tr>
+    `;
+  });
+}
+
+function openModal(modalId) {
+  const modal = document.getElementById(modalId || 'userModal');
+  if (!modal) return;
+  
+  toggleFormFields(true);
+
+  if (document.getElementById('uId')) document.getElementById('uId').value = '';
+  if (document.getElementById('uName')) document.getElementById('uName').value = '';
+  if (document.getElementById('uEmail')) document.getElementById('uEmail').value = '';
+  if (document.getElementById('uPass')) {
+    document.getElementById('uPass').value = '';
+    document.getElementById('uPass').required = true;
+  }
+  if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
+  
+  const passLabel = document.querySelector('#passGroup label');
+  if (passLabel) passLabel.innerText = "Temporary Password";
+
+  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = true;
+  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = true;
+  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = true;
+  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = true;
+
+  if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Add New User';
+
+  modal.style.display = 'flex';
+}
+
+function openEditUser(id) {
+  const u = usersList.find(x => x.id === id);
+  if (!u) return;
+
+  const isSuperAdmin = !settingsCurrentUser.email || 
+                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
+                       settingsCurrentUser.role === 'admin';
+
+  if (document.getElementById('uId')) document.getElementById('uId').value = u.id;
+  if (document.getElementById('uName')) document.getElementById('uName').value = u.name || '';
+  if (document.getElementById('uEmail')) document.getElementById('uEmail').value = u.email || '';
+  if (document.getElementById('uRole')) document.getElementById('uRole').value = u.role || 'chef';
+  if (document.getElementById('uBrand')) document.getElementById('uBrand').value = u.brand_permission || 'All';
+
+  if (document.getElementById('uCanOrder')) document.getElementById('uCanOrder').checked = u.can_procure_order !== false;
+  if (document.getElementById('uCanReceive')) document.getElementById('uCanReceive').checked = u.can_receive_stock !== false;
+  if (document.getElementById('uCanUploadExcel')) document.getElementById('uCanUploadExcel').checked = u.can_upload_excel !== false;
+  if (document.getElementById('uCanDeleteProducts')) document.getElementById('uCanDeleteProducts').checked = u.can_delete_products !== false;
+
+  if (document.getElementById('uPass')) {
+    document.getElementById('uPass').value = '';
+    document.getElementById('uPass').required = !isSuperAdmin;
+  }
+
+  if (isSuperAdmin) {
+    toggleFormFields(true);
+    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'none';
+    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen"></i> Edit User Details';
+  } else {
+    toggleFormFields(false);
+    if (document.getElementById('passGroup')) document.getElementById('passGroup').style.display = 'block';
     
-    <div class="user-info" style="display: flex; align-items: center;">
-      <span id="currentUserDisplay" style="font-weight: 600;"></span>
-    </div>
-  </header>
+    const passLabel = document.querySelector('#passGroup label');
+    if (passLabel) passLabel.innerText = "New Password";
 
-  <div class="container">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3>Users & Permissions List</h3>
-        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
-      </div>
+    if (document.getElementById('modalTitle')) document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
+  }
+  
+  const modal = document.getElementById('userModal');
+  if (modal) modal.style.display = 'flex';
+}
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Branch / Brand Permission</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="usersBody">
-          <!-- Data populated dynamically via JS -->
-        </tbody>
-      </table>
-    </div>
-  </div>
+function toggleFormFields(showAll) {
+  const displayStyle = showAll ? 'block' : 'none';
+  const nameGroup = document.getElementById('uName')?.closest('.form-group');
+  const emailGroup = document.getElementById('uEmail')?.closest('.form-group');
+  const roleGroup = document.getElementById('uRole')?.closest('.form-group');
+  const brandGroup = document.getElementById('uBrand')?.closest('.form-group');
+  const procurementGroup = document.getElementById('procurementTogglesGroup');
 
-  <!-- Modal: Add / Edit User -->
-  <div id="userModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h3 id="modalTitle">Add New User</h3>
-      <form onsubmit="saveUser(event)" style="margin-top:15px;">
-        <input type="hidden" id="uId">
-        
-        <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" id="uName" required>
-        </div>
-        
-        <div class="form-group">
-          <label>Email Address</label>
-          <input type="email" id="uEmail" required>
-        </div>
-        
-        <div class="form-group" id="passGroup">
-          <label>Temporary Password</label>
-          <input type="password" id="uPass">
-        </div>
-        
-        <div class="form-group">
-          <label>System Role Permission</label>
-          <select id="uRole" required>
-            <option value="admin">System Admin (Full Access + Inventory & Requests Edit)</option>
-            <option value="store_manager">Store Manager (Edit Inventory + Approve Requests)</option>
-            <option value="chef">Chef / Branch (Create Supply Requests Only - No Inventory Edit)</option>
-          </select>
-        </div>
+  if (nameGroup) nameGroup.style.display = displayStyle;
+  if (emailGroup) emailGroup.style.display = displayStyle;
+  if (roleGroup) roleGroup.style.display = displayStyle;
+  if (brandGroup) brandGroup.style.display = displayStyle;
+  if (procurementGroup) procurementGroup.style.display = displayStyle;
+}
 
-        <div class="form-group">
-          <label>Brand / Branch Permission</label>
-          <select id="uBrand" required>
-            <option value="All">All Branches (Rudy + B-marlin + Shared)</option>
-            <option value="Rudy">Rudy (Includes Rudy & Shared Products)</option>
-            <option value="B-marlin">B-marlin (Includes B-marlin & Shared Products)</option>
-          </select>
-        </div>
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId || 'userModal');
+  if (modal) modal.style.display = 'none';
+}
 
-        <!-- Procurement & Products Action Permissions Toggles -->
-        <div class="form-group" id="procurementTogglesGroup">
-          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Action Permissions:</label>
-          
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanOrder" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
+async function saveUser(e) {
+  if (e && e.preventDefault) e.preventDefault();
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanReceive" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
+  const id = document.getElementById('uId')?.value;
+  const name = document.getElementById('uName')?.value;
+  const email = document.getElementById('uEmail')?.value;
+  const pass = document.getElementById('uPass')?.value;
+  const role = document.getElementById('uRole')?.value;
+  const brand_permission = document.getElementById('uBrand')?.value;
+  const can_procure_order = document.getElementById('uCanOrder')?.checked;
+  const can_receive_stock = document.getElementById('uCanReceive')?.checked;
+  const can_upload_excel = document.getElementById('uCanUploadExcel')?.checked;
+  const can_delete_products = document.getElementById('uCanDeleteProducts')?.checked;
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-file-excel" style="color:#f59e0b;"></i> Can Upload Excel Products</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanUploadExcel" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
+  const isSuperAdmin = !settingsCurrentUser.email || 
+                       settingsCurrentUser.email === 'storage.futurefoods@gmail.com' || 
+                       settingsCurrentUser.role === 'admin';
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-trash-can" style="color:#ef4444;"></i> Can Delete Products</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanDeleteProducts" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
+  if (id) {
+    let updateData = {};
 
-        <div style="display:flex; gap:10px; margin-top:20px;">
-          <button type="submit" class="btn">Save Data</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
+    if (isSuperAdmin) {
+      updateData = { 
+        name, 
+        email, 
+        role, 
+        brand_permission,
+        can_procure_order,
+        can_receive_stock,
+        can_upload_excel,
+        can_delete_products
+      };
+    } else {
+      if (pass) updateData.password = pass;
+    }
 
-  <!-- Script Includes -->
-  <script src="js/supabase-config.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/settings.js"></script>
-</body>
-</html>
+    const { error } = await _supabase.from('users').update(updateData).eq('id', id);
+
+    if (error) alert("Error updating user: " + error.message);
+    else {
+      alert(isSuperAdmin ? "User updated successfully!" : "Password changed successfully!");
+      closeModal('userModal');
+      loadUsers();
+    }
+  } else {
+    const { error } = await _supabase.from('users').insert([{
+      name,
+      email,
+      password: pass,
+      role,
+      brand_permission,
+      can_procure_order,
+      can_receive_stock,
+      can_upload_excel,
+      can_delete_products
+    }]);
+
+    if (error) alert("Error adding user: " + error.message);
+    else {
+      alert("User added successfully!");
+      closeModal('userModal');
+      loadUsers();
+    }
+  }
+}
+
+async function deleteUser(id) {
+  if (!confirm("Are you sure you want to delete this user?")) return;
+  const { error } = await _supabase.from('users').delete().eq('id', id);
+  if (error) alert("Error deleting user: " + error.message);
+  else loadUsers();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSettings);
+} else {
+  initSettings();
+}
