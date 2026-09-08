@@ -92,7 +92,7 @@
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
         <h3>Users & Permissions List</h3>
-        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
+        <button id="btnAddNewUser" class="btn" onclick="openModal('userModal')">+ Add New User</button>
       </div>
 
       <table>
@@ -119,73 +119,95 @@
       <form onsubmit="saveUser(event)" style="margin-top:15px;">
         <input type="hidden" id="uId">
         
+        <!-- Full Name (الاسم يظهر للجميع) -->
         <div class="form-group">
           <label>Full Name</label>
           <input type="text" id="uName" required>
         </div>
         
-        <div class="form-group">
+        <!-- Email (للأدمن فقط) -->
+        <div class="form-group admin-only-field">
           <label>Email Address</label>
-          <input type="email" id="uEmail" required>
+          <input type="email" id="uEmail">
         </div>
         
+        <!-- Password (اختياري عند التعديل، إجباري للجديد) -->
         <div class="form-group" id="passGroup">
-          <label>Temporary Password</label>
-          <input type="password" id="uPass">
+          <label>Password</label>
+          <input type="password" id="uPass" placeholder="Leave blank to keep current password">
         </div>
         
-        <div class="form-group">
-          <label>System Role Permission</label>
-          <select id="uRole" required>
-            <option value="admin">System Admin (Full Access + Inventory & Requests Edit)</option>
-            <option value="store_manager">Store Manager (Edit Inventory + Approve Requests)</option>
-            <option value="chef">Chef / Branch (Create Supply Requests Only - No Inventory Edit)</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Brand / Branch Permission</label>
-          <select id="uBrand" required>
-            <option value="All">All Branches (Rudy + B-marlin + Shared)</option>
-            <option value="Rudy">Rudy (Includes Rudy & Shared Products)</option>
-            <option value="B-marlin">B-marlin (Includes B-marlin & Shared Products)</option>
-          </select>
-        </div>
-
-        <!-- Procurement & Products Action Permissions Toggles -->
-        <div class="form-group" id="procurementTogglesGroup">
-          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Action Permissions:</label>
-          
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanOrder" checked>
-              <span class="slider"></span>
-            </label>
+        <!-- Role & Brand (للأدمن فقط) -->
+        <div class="admin-only-field">
+          <div class="form-group">
+            <label>System Role Permission</label>
+            <select id="uRole">
+              <option value="admin">System Admin (Full Access + Inventory & Requests Edit)</option>
+              <option value="store_manager">Store Manager (Edit Inventory + Approve Requests)</option>
+              <option value="chef">Chef / Branch (Create Supply Requests Only - No Inventory Edit)</option>
+            </select>
           </div>
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanReceive" checked>
-              <span class="slider"></span>
-            </label>
+          <div class="form-group">
+            <label>Brand / Branch Permission</label>
+            <select id="uBrand">
+              <option value="All">All Branches (Rudy + B-marlin + Shared)</option>
+              <option value="Rudy">Rudy (Includes Rudy & Shared Products)</option>
+              <option value="B-marlin">B-marlin (Includes B-marlin & Shared Products)</option>
+            </select>
           </div>
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-file-excel" style="color:#f59e0b;"></i> Can Upload Excel Products</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanUploadExcel" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
+          <!-- Procurement & Products Action Permissions Toggles -->
+          <div class="form-group" id="procurementTogglesGroup">
+            <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Action Permissions:</label>
+            
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-pen-to-square" style="color:#eab308;"></i> Can Edit Inventory Items</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanEditInventory">
+                <span class="slider"></span>
+              </label>
+            </div>
 
-          <div class="toggle-row">
-            <span class="toggle-label"><i class="fa-solid fa-trash-can" style="color:#ef4444;"></i> Can Delete Products</span>
-            <label class="switch">
-              <input type="checkbox" id="uCanDeleteProducts" checked>
-              <span class="slider"></span>
-            </label>
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-square-plus" style="color:#3b82f6;"></i> Can Add Products</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanAddProducts">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanOrder">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanReceive">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-file-excel" style="color:#f59e0b;"></i> Can Upload Excel Products</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanUploadExcel">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label"><i class="fa-solid fa-trash-can" style="color:#ef4444;"></i> Can Delete Products</span>
+              <label class="switch">
+                <input type="checkbox" id="uCanDeleteProducts">
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
         </div>
 
