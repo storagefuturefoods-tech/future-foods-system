@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory Management</title>
   <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
 
   <!-- Font Awesome Icons Library -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -38,11 +38,11 @@
         <div>
           <button class="btn" onclick="downloadTemplate()">Download Excel Template</button>
           <input type="file" id="excelInput" accept=".xlsx, .xls" style="display:none" onchange="handleExcelUpload(event)">
-          <button class="btn btn-warning" onclick="document.getElementById('excelInput').click()">Upload Products from Excel</button>
+          <button id="btnUploadExcel" class="btn btn-warning" onclick="document.getElementById('excelInput').click()">Upload Products from Excel</button>
         </div>
         <div>
           <button class="btn btn-secondary" onclick="exportSelected()">Export Selected/All</button>
-          <button class="btn btn-danger" onclick="deleteSelected()">Delete Selected</button>
+          <button id="btnDeleteSelected" class="btn btn-danger" onclick="deleteSelected()">Delete Selected</button>
         </div>
       </div>
 
