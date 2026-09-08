@@ -45,6 +45,15 @@ function canUserDeleteProducts() {
 async function loadProducts() {
   invCurrentUser = getInvCurrentUser();
 
+  // تحديث بيانات المستخدم الحالي من قاعدة البيانات لضمان دقة الصلاحيات
+  if (invCurrentUser.id) {
+    const { data: userData } = await _supabase.from('users').select('*').eq('id', invCurrentUser.id).single();
+    if (userData) {
+      invCurrentUser = { ...invCurrentUser, ...userData };
+      localStorage.setItem('app_user', JSON.stringify(invCurrentUser));
+    }
+  }
+
   // إظهار رسالة جاري التحميل فوراً
   const tbody = document.getElementById('inventoryBody');
   if (tbody) {
@@ -108,7 +117,7 @@ function filterProductsByBrandPermission(allProducts, userBrandPermission) {
 
 // 4. Search Handler (Filter by SKU, Name Ar, Name En)
 function handleSearch() {
-  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const query = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
 
   if (!query) {
     filteredProducts = [...products];
@@ -195,7 +204,6 @@ function applyUserPermissions() {
   const deleteBtn = document.getElementById('btnDeleteSelected') || document.querySelector('button[onclick*="deleteSelected"]');
   const addBtn = document.getElementById('btnAddProduct') || document.querySelector('button[onclick*="openAddModal"]');
 
-  // التحكم بأزرار الإضافة والرفع والحذف بناءً على مفاتيح الصلاحية
   if (uploadBtn) {
     uploadBtn.style.display = canUserUploadExcel() ? 'inline-block' : 'none';
   }
@@ -310,26 +318,35 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// 10. Open Edit Modal
+// 10. Open Add/Edit Modals
+function openAddModal() {
+  if (!canUserAddProducts()) return alert("Sorry, you do not have permission to add products.");
+  const modal = document.getElementById('addModal') || document.getElementById('editModal');
+  if (modal) modal.style.display = 'flex';
+}
+
 function openEditModal(id) {
   if (!canUserEditInventory()) return alert("Sorry, you do not have permission to edit products.");
 
   const p = products.find(x => x.id === id);
   if (!p) return;
-  document.getElementById('editProdId').value = p.id;
-  document.getElementById('editImage').value = p.image_url || '';
-  document.getElementById('editSku').value = p.sku || '';
-  document.getElementById('editNameAr').value = p.name_ar || '';
-  document.getElementById('editNameEn').value = p.name_en || '';
-  document.getElementById('editBrand').value = p.brand || '';
+  
+  if (document.getElementById('editProdId')) document.getElementById('editProdId').value = p.id;
+  if (document.getElementById('editImage')) document.getElementById('editImage').value = p.image_url || '';
+  if (document.getElementById('editSku')) document.getElementById('editSku').value = p.sku || '';
+  if (document.getElementById('editNameAr')) document.getElementById('editNameAr').value = p.name_ar || '';
+  if (document.getElementById('editNameEn')) document.getElementById('editNameEn').value = p.name_en || '';
+  if (document.getElementById('editBrand')) document.getElementById('editBrand').value = p.brand || '';
   
   const catInput = document.getElementById('editCategory');
   if (catInput) catInput.value = p.category || '';
 
-  document.getElementById('editQty').value = p.quantity || 0;
-  document.getElementById('editMinQty').value = p.min_quantity || 0;
-  document.getElementById('editBoxCap').value = p.items_per_box || 1;
-  document.getElementById('editModal').style.display = 'flex';
+  if (document.getElementById('editQty')) document.getElementById('editQty').value = p.quantity || 0;
+  if (document.getElementById('editMinQty')) document.getElementById('editMinQty').value = p.min_quantity || 0;
+  if (document.getElementById('editBoxCap')) document.getElementById('editBoxCap').value = p.items_per_box || 1;
+  
+  const modal = document.getElementById('editModal');
+  if (modal) modal.style.display = 'flex';
 }
 
 function closeModal(id) { 
@@ -339,21 +356,21 @@ function closeModal(id) {
 
 // 11. Save edited product
 async function saveProductEdit(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   if (!canUserEditInventory()) return alert("Sorry, you do not have permission to edit products.");
 
-  const id = document.getElementById('editProdId').value;
+  const id = document.getElementById('editProdId')?.value;
   const catInput = document.getElementById('editCategory');
 
   const updated = {
-    image_url: document.getElementById('editImage').value,
-    name_ar: document.getElementById('editNameAr').value,
-    name_en: document.getElementById('editNameEn').value,
-    brand: document.getElementById('editBrand').value,
+    image_url: document.getElementById('editImage')?.value || '',
+    name_ar: document.getElementById('editNameAr')?.value || '',
+    name_en: document.getElementById('editNameEn')?.value || '',
+    brand: document.getElementById('editBrand')?.value || '',
     category: catInput ? catInput.value.trim() : '',
-    quantity: parseInt(document.getElementById('editQty').value),
-    min_quantity: parseInt(document.getElementById('editMinQty').value),
-    items_per_box: parseInt(document.getElementById('editBoxCap').value)
+    quantity: parseInt(document.getElementById('editQty')?.value || 0),
+    min_quantity: parseInt(document.getElementById('editMinQty')?.value || 0),
+    items_per_box: parseInt(document.getElementById('editBoxCap')?.value || 1)
   };
 
   const { error } = await _supabase.from('products').update(updated).eq('id', id);
