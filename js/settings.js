@@ -1,402 +1,205 @@
-let products = [];
-let filteredProducts = [];
-let invCurrentUser = {};
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - User Management</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
 
-// Safe currentUser retrieval
-function getInvCurrentUser() {
-  try {
-    return JSON.parse(localStorage.getItem('app_user') || localStorage.getItem('currentUser') || '{}');
-  } catch (e) {
-    return {};
-  }
-}
+  <!-- Font Awesome Library for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-// Check if user is Admin or Store Manager
-function isInvAdminOrManager() {
-  const u = getInvCurrentUser();
-  const role = (u.role || '').toLowerCase();
-  const email = (u.email || '').toLowerCase();
-  
-  return role === 'admin' || role === 'store_manager' || email === 'storage.futurefoods@gmail.com';
-}
-
-// Check if user has permission to Upload Excel
-function canUserUploadExcel() {
-  const u = getInvCurrentUser();
-  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
-  return u.can_upload_excel !== false && isInvAdminOrManager();
-}
-
-// Check if user has permission to Delete Products
-function canUserDeleteProducts() {
-  const u = getInvCurrentUser();
-  if (u.email === 'storage.futurefoods@gmail.com' || u.role === 'admin') return true;
-  return u.can_delete_products !== false && isInvAdminOrManager();
-}
-
-// 1. Fetch products & filter based on user permission
-async function loadProducts() {
-  invCurrentUser = getInvCurrentUser();
-
-  // إظهار رسالة جاري التحميل فوراً
-  const tbody = document.getElementById('inventoryBody');
-  if (tbody) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="11" style="text-align:center; padding:30px; color:var(--text-muted, #aaa);">
-          Loading products...
-        </td>
-      </tr>
-    `;
-  }
-
-  const { data, error } = await _supabase
-    .from('products')
-    .select('*')
-    .order('id', { ascending: true });
-
-  if (error) {
-    alert("Error fetching products: " + error.message);
-    if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#e53e3e;">Failed to load products.</td></tr>`;
+  <style>
+    /* Modern Toggle Switches Style */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      margin-top: 10px;
     }
-    return;
-  }
-
-  const rawProducts = data || [];
-
-  // Filter products by brand permission
-  const userBrandPermission = invCurrentUser.brand_permission || invCurrentUser.brand || 'All';
-  products = filterProductsByBrandPermission(rawProducts, userBrandPermission);
-  filteredProducts = [...products];
-
-  renderTable();
-  applyUserPermissions();
-}
-
-// 2. Flexible brand permission filter
-function filterProductsByBrandPermission(allProducts, userBrandPermission) {
-  const userBrand = (userBrandPermission || 'All').trim().toLowerCase();
-
-  if (
-    userBrand === 'all' || 
-    userBrand === '' || 
-    userBrand.includes('&') || 
-    userBrand.includes('pizzeria') || 
-    (userBrand.includes('marlin') && userBrand.includes('rudy'))
-  ) {
-    return allProducts;
-  }
-
-  return allProducts.filter(p => {
-    const pBrand = (p.brand || '').trim().toLowerCase();
-    return (
-      pBrand === userBrand || 
-      pBrand === 'all' || 
-      pBrand.includes('&') || 
-      pBrand.includes('shared')
-    );
-  });
-}
-
-// 3. Search Handler (Filter by SKU, Name Ar, Name En)
-function handleSearch() {
-  const query = document.getElementById('searchInput').value.trim().toLowerCase();
-
-  if (!query) {
-    filteredProducts = [...products];
-  } else {
-    filteredProducts = products.filter(p => {
-      const sku = (p.sku || '').toLowerCase();
-      const nameAr = (p.name_ar || '').toLowerCase();
-      const nameEn = (p.name_en || '').toLowerCase();
-
-      return sku.includes(query) || nameAr.includes(query) || nameEn.includes(query);
-    });
-  }
-
-  renderTable();
-}
-
-// 4. Open Image Preview Modal
-function openImagePreview(url) {
-  const imgElem = document.getElementById('previewImageSrc');
-  if (imgElem) imgElem.src = url;
-  const modal = document.getElementById('imagePreviewModal');
-  if (modal) modal.style.display = 'flex';
-}
-
-// 5. Render inventory table
-function renderTable() {
-  const tbody = document.getElementById('inventoryBody');
-  const countElem = document.getElementById('displayedCount');
-
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  // Update displayed count counter
-  if (countElem) countElem.innerText = filteredProducts.length;
-
-  if (filteredProducts.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px; color:#888;">No products found.</td></tr>';
-    return;
-  }
-
-  const isUserAdmin = isInvAdminOrManager();
-
-  filteredProducts.forEach(p => {
-    const isLow = p.quantity <= (p.min_quantity || 0);
-    const imgUrl = p.image_url || 'https://via.placeholder.com/50';
+    .toggle-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-color, #e2e8f0);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #4b5563; /* الرمادي للمطفي */
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #10b981; /* الأخضر للمفعل */
+    }
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+  </style>
+</head>
+<body>
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+    <nav style="display: flex; align-items: center; gap: 12px;">
+      <a href="index.html" title="Home" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-house"></i></a>
+      <a href="inventory.html" title="Inventory" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-boxes-stacked"></i></a>
+      <a href="supply-requests.html" title="Supply Requests" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-truck-ramp-box"></i></a>
+      <a href="procurement.html" title="Procurement" style="font-size: 1.2rem; padding: 6px 10px;"><i class="fa-solid fa-clipboard-list"></i></a>
+      <a href="settings.html" title="Settings" style="font-size: 1.2rem; padding: 6px 10px; color: #2563eb;"><i class="fa-solid fa-gear"></i></a>
+      
+      <button class="btn btn-danger" onclick="logout()" title="Logout" style="padding: 6px 10px; border: none; background: transparent; color: #e53e3e; font-size: 1.2rem; cursor: pointer;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </nav>
     
-    const actionsCell = isUserAdmin ? `
-      <td>
-        <button class="btn btn-edit-action" onclick="openEditModal(${p.id})">Edit</button>
-        <button class="btn btn-status-action ${p.is_disabled ? 'btn-success' : 'btn-warning'}" onclick="toggleStatus(${p.id}, ${p.is_disabled})">
-          ${p.is_disabled ? 'Enable' : 'Disable'}
-        </button>
-      </td>
-    ` : `<td><span style="color:var(--text-muted); font-size:0.8rem;">View Only</span></td>`;
+    <div class="user-info" style="display: flex; align-items: center;">
+      <span id="currentUserDisplay" style="font-weight: 600;"></span>
+    </div>
+  </header>
 
-    tbody.innerHTML += `
-      <tr style="${isLow ? 'background-color: rgba(255, 0, 0, 0.1);' : ''}">
-        <td><input type="checkbox" class="prod-select" value="${p.id}"></td>
-        <td>
-          <img src="${imgUrl}" width="40" height="40" 
-               style="object-fit:cover; border-radius:4px; cursor:pointer;" 
-               onerror="this.src='https://via.placeholder.com/40'" 
-               onclick="openImagePreview('${imgUrl}')" 
-               title="Click to view image">
-        </td>
-        <td>${p.sku || '-'}</td>
-        <td>${p.name_ar || '-'}</td>
-        <td>${p.name_en || '-'}</td>
-        <td>${p.brand || '-'}</td>
-        <td><span style="background:var(--input-bg, #eee); padding:2px 6px; border-radius:4px; font-size:0.85rem;">${p.category || '-'}</span></td>
-        <td>${p.quantity} ${isLow ? '⚠️' : ''}</td>
-        <td>${p.items_per_box || 1}</td>
-        <td>${p.is_disabled ? 'Disabled' : 'Active'}</td>
-        ${actionsCell}
-      </tr>
-    `;
-  });
-}
+  <div class="container">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3>Users & Permissions List</h3>
+        <button class="btn" onclick="openModal('userModal')">+ Add New User</button>
+      </div>
 
-// 6. Apply UI restrictions for users based on granular permissions
-function applyUserPermissions() {
-  const uploadBtn = document.getElementById('btnUploadExcel') || document.querySelector('button[onclick*="excelInput"]');
-  const deleteBtn = document.getElementById('btnDeleteSelected') || document.querySelector('button[onclick*="deleteSelected"]');
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Branch / Brand Permission</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="usersBody">
+          <!-- Data populated dynamically via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-  // التحكم بإظهار أو إخفاء زر الرفع من إكسل
-  if (uploadBtn) {
-    if (!canUserUploadExcel()) {
-      uploadBtn.style.display = 'none';
-    } else {
-      uploadBtn.style.display = 'inline-block';
-    }
-  }
+  <!-- Modal: Add / Edit User -->
+  <div id="userModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3 id="modalTitle">Add New User</h3>
+      <form onsubmit="saveUser(event)" style="margin-top:15px;">
+        <input type="hidden" id="uId">
+        
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="uName" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="uEmail" required>
+        </div>
+        
+        <div class="form-group" id="passGroup">
+          <label>Temporary Password</label>
+          <input type="password" id="uPass">
+        </div>
+        
+        <div class="form-group">
+          <label>System Role Permission</label>
+          <select id="uRole" required>
+            <option value="admin">System Admin (Full Access + Inventory & Requests Edit)</option>
+            <option value="store_manager">Store Manager (Edit Inventory + Approve Requests)</option>
+            <option value="chef">Chef / Branch (Create Supply Requests Only - No Inventory Edit)</option>
+          </select>
+        </div>
 
-  // التحكم بإظهار أو إخفاء زر الحذف
-  if (deleteBtn) {
-    if (!canUserDeleteProducts()) {
-      deleteBtn.style.display = 'none';
-    } else {
-      deleteBtn.style.display = 'inline-block';
-    }
-  }
-}
+        <div class="form-group">
+          <label>Brand / Branch Permission</label>
+          <select id="uBrand" required>
+            <option value="All">All Branches (Rudy + B-marlin + Shared)</option>
+            <option value="Rudy">Rudy (Includes Rudy & Shared Products)</option>
+            <option value="B-marlin">B-marlin (Includes B-marlin & Shared Products)</option>
+          </select>
+        </div>
 
-// 7. Download Excel template
-function downloadTemplate() {
-  const template = [
-    { 
-      sku: "712211", 
-      image_url: "https://via.placeholder.com/100", 
-      name_ar: "بطاطس حلوة مقلية", 
-      name_en: "Sweet fries", 
-      brand: "Rudy", 
-      category: "Vegetables", 
-      quantity: 15, 
-      min_quantity: 11, 
-      items_per_box: 1 
-    },
-    { 
-      sku: "712218", 
-      image_url: "https://via.placeholder.com/100", 
-      name_ar: "جبنة موزاريلا", 
-      name_en: "Buffalo Cheese", 
-      brand: "Rudy Pizzeria & B-Marlin", 
-      category: "Cheese", 
-      quantity: 36, 
-      min_quantity: 18, 
-      items_per_box: 12 
-    }
-  ];
-  const ws = XLSX.utils.json_to_sheet(template);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Products_Template");
-  XLSX.writeFile(wb, "Products_Template.xlsx");
-}
+        <!-- Procurement & Products Action Permissions Toggles -->
+        <div class="form-group" id="procurementTogglesGroup">
+          <label style="margin-top: 15px; display: block; font-weight: bold; color: #3b82f6;">Action Permissions:</label>
+          
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-paper-plane" style="color:#3b82f6;"></i> Can Order (Procurement)</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanOrder" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
 
-// 8. Handle Excel Upload
-async function handleExcelUpload(e) {
-  if (!canUserUploadExcel()) {
-    alert("Sorry, you do not have permission to upload products via Excel.");
-    e.target.value = '';
-    return;
-  }
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-boxes-packing" style="color:#10b981;"></i> Can Receive & Stock</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanReceive" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
 
-  const file = e.target.files[0];
-  if (!file) return;
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-file-excel" style="color:#f59e0b;"></i> Can Upload Excel Products</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanUploadExcel" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
 
-  const reader = new FileReader();
-  
-  reader.onload = async (evt) => {
-    try {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet);
+          <div class="toggle-row">
+            <span class="toggle-label"><i class="fa-solid fa-trash-can" style="color:#ef4444;"></i> Can Delete Products</span>
+            <label class="switch">
+              <input type="checkbox" id="uCanDeleteProducts" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
 
-      let duplicates = [];
-      let validRows = [];
+        <div style="display:flex; gap:10px; margin-top:20px;">
+          <button type="submit" class="btn">Save Data</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      for (let r of rows) {
-        const skuStr = String(r.sku || r.SKU || '').trim();
-        if (!skuStr) continue;
-
-        const existsLocally = validRows.some(x => x.sku === skuStr);
-        const existsInDB = products.some(x => x.sku === skuStr);
-
-        if (existsLocally || existsInDB) {
-          duplicates.push(skuStr);
-        } else {
-          validRows.push({
-            sku: skuStr,
-            image_url: r.image_url || r.Image || '',
-            name_ar: r.name_ar || '',
-            name_en: r.name_en || '',
-            brand: r.brand || r.Brand || 'Rudy Pizzeria & B-Marlin',
-            category: String(r.category || r.Category || '').trim(),
-            quantity: parseInt(r.quantity || 0),
-            min_quantity: parseInt(r.min_quantity || 5),
-            items_per_box: parseInt(r.items_per_box || r.box_capacity || 1)
-          });
-        }
-      }
-
-      if (duplicates.length > 0) {
-        alert(`⚠️ Duplicate SKU codes ignored:\n${duplicates.join(', ')}`);
-      }
-
-      if (validRows.length > 0) {
-        const { error } = await _supabase.from('products').insert(validRows);
-        if (error) {
-          alert("Error inserting data: " + error.message);
-        } else {
-          alert(`Successfully uploaded ${validRows.length} products!`);
-          loadProducts();
-        }
-      }
-    } catch (err) {
-      alert("Error reading Excel file: " + err.message);
-    }
-    e.target.value = '';
-  };
-  
-  reader.readAsArrayBuffer(file);
-}
-
-// 9. Open Edit Modal
-function openEditModal(id) {
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
-
-  const p = products.find(x => x.id === id);
-  if (!p) return;
-  document.getElementById('editProdId').value = p.id;
-  document.getElementById('editImage').value = p.image_url || '';
-  document.getElementById('editSku').value = p.sku || '';
-  document.getElementById('editNameAr').value = p.name_ar || '';
-  document.getElementById('editNameEn').value = p.name_en || '';
-  document.getElementById('editBrand').value = p.brand || '';
-  
-  const catInput = document.getElementById('editCategory');
-  if (catInput) catInput.value = p.category || '';
-
-  document.getElementById('editQty').value = p.quantity || 0;
-  document.getElementById('editMinQty').value = p.min_quantity || 0;
-  document.getElementById('editBoxCap').value = p.items_per_box || 1;
-  document.getElementById('editModal').style.display = 'flex';
-}
-
-function closeModal(id) { 
-  const el = document.getElementById(id);
-  if (el) el.style.display = 'none'; 
-}
-
-// 10. Save edited product
-async function saveProductEdit(e) {
-  e.preventDefault();
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to edit products.");
-
-  const id = document.getElementById('editProdId').value;
-  const catInput = document.getElementById('editCategory');
-
-  const updated = {
-    image_url: document.getElementById('editImage').value,
-    name_ar: document.getElementById('editNameAr').value,
-    name_en: document.getElementById('editNameEn').value,
-    brand: document.getElementById('editBrand').value,
-    category: catInput ? catInput.value.trim() : '',
-    quantity: parseInt(document.getElementById('editQty').value),
-    min_quantity: parseInt(document.getElementById('editMinQty').value),
-    items_per_box: parseInt(document.getElementById('editBoxCap').value)
-  };
-
-  const { error } = await _supabase.from('products').update(updated).eq('id', id);
-  if (error) {
-    alert("Error updating product: " + error.message);
-  } else {
-    closeModal('editModal');
-    loadProducts();
-  }
-}
-
-// 11. Toggle active/disabled status
-async function toggleStatus(id, currentStatus) {
-  if (!isInvAdminOrManager()) return alert("Sorry, you do not have permission to toggle status.");
-  await _supabase.from('products').update({ is_disabled: !currentStatus }).eq('id', id);
-  loadProducts();
-}
-
-// 12. Delete selected products
-async function deleteSelected() {
-  if (!canUserDeleteProducts()) {
-    return alert("Sorry, you do not have permission to delete products.");
-  }
-
-  const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => cb.value);
-  if (ids.length === 0) return alert("Please select products to delete.");
-  if (confirm("Are you sure you want to delete the selected products?")) {
-    await _supabase.from('products').delete().in('id', ids);
-    loadProducts();
-  }
-}
-
-function toggleSelectAll(master) {
-  document.querySelectorAll('.prod-select').forEach(cb => cb.checked = master.checked);
-}
-
-// 13. Export products to Excel
-function exportSelected() {
-  const ids = Array.from(document.querySelectorAll('.prod-select:checked')).map(cb => parseInt(cb.value));
-  const listToExport = ids.length > 0 ? filteredProducts.filter(p => ids.includes(p.id)) : filteredProducts;
-  
-  if (listToExport.length === 0) return alert("No products to export.");
-
-  const ws = XLSX.utils.json_to_sheet(listToExport);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Products");
-  XLSX.writeFile(wb, "Exported_Products.xlsx");
-}
-
-document.addEventListener('DOMContentLoaded', loadProducts);
+  <!-- Script Includes -->
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>
